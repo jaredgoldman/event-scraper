@@ -1,0 +1,31 @@
+{
+  "name": "eventScraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "db:generate": "dotenv -e .env -- prisma generate",
+    "db:push": "dotenv -e .env -- prisma db push"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/cheerio": "^0.22.35",
+    "@types/node": "^20.11.30",
+    "@types/node-cron": "^3.0.11",
+    "envalid": "^8.0.0",
+    "typescript": "^5.4.3"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.11.0",
+    "cheerio": "1.0.0-rc.12",
+    "dotenv-cli": "^7.4.1",
+    "node-cron": "^3.0.3",
+    "openai": "^4.30.0",
+    "prisma": "^5.11.0",
+    "puppeteer-core": "^22.6.1",
+    "ts-node": "^10.9.2"
+  }
+}

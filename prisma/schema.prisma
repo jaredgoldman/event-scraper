@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["jsonProtocol"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  email     String   @unique
+  name      String?
+  role      String   @default("ADMIN")
+}
+
+model Artist {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  name            String   @unique
+  genre           String?
+  photoPath       String?
+  photoName       String?
+  instagramHandle String?
+  featured        Boolean  @default(false)
+  website         String?
+  events          Event[]
+  active          Boolean  @default(true)
+  description     String?
+  approved        Boolean @default(false)
+
+  @@index([featured, name])
+}
+
+model Venue {
+  id              String      @id @default(cuid())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  name            String
+  address         String
+  city            String
+  photoPath       String?
+  photoName       String?
+  featured        Boolean     @default(false)
+  instagramHandle String?
+  facebookLink    String?
+  website         String
+  phoneNumber     String
+  events          Event[]
+  active          Boolean     @default(true)
+  latitude        Float
+  longitude       Float
+  crawlable       Boolean     @default(false)
+  eventsPath      String?
+  description     String?
+  approved        Boolean @default(false)
+
+  @@index([featured])
+}
+
+
+model Event {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  name            String
+  startDate       DateTime
+  endDate         DateTime
+  artist          Artist   @relation(fields: [artistId], references: [id])
+  featured        Boolean  @default(false)
+  instagramHandle String?
+  website         String?
+  venue           Venue    @relation(fields: [venueId], references: [id])
+  artistId        String
+  venueId         String
+  cancelled       Boolean  @default(false)
+  description     String?
+
+  approved        Boolean @default(false)
+
+  @@unique([startDate, venueId])
+  @@index([featured, name])
+}
