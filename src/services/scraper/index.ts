@@ -4,31 +4,26 @@ import { wait } from "../../utils";
 import OpenAI from "openai";
 import { Venue } from "@prisma/client";
 import env from "../../config/env";
-import { ScrapedEvent } from "./types";
+import { ScrapedEvent } from "../../types";
 import { cleanHtml } from "./utils";
 
-export default class ScraperService {
-  private venue: Venue;
+export default class Scraper {
   private ai: OpenAI;
 
-  constructor(venue: Venue) {
-    this.venue = venue;
+  constructor() {
     this.ai = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
+      organization: env.OPENAI_ORG_ID,
     });
   }
 
-  // TODO: parse into smaller functions for use with limited lambda times
   public async getEvents(venue: Venue): Promise<ScrapedEvent[]> {
     try {
       if (!venue.website || !venue.eventsPath) {
         throw new Error("No website or events path provided");
       }
 
-      this.venue = venue;
-      const url = `https://${this.venue.website}${
-        this.venue?.eventsPath || ""
-      }`;
+      const url = `https://${venue.website}${venue?.eventsPath || ""}`;
       const page = await this.loadPage(url);
       const content = await page.content();
       const parsed = cheerio.load(content);
@@ -44,6 +39,14 @@ export default class ScraperService {
     } catch (e) {
       throw new Error(`Error getting events: ${e}`);
     }
+  }
+
+  private async chunkContent(content: string, chunkSize = 1000) {
+    const chunks = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+      chunks.push(content.slice(i, i + chunkSize));
+    }
+    return chunks;
   }
 
   private async loadPage(url: string) {
