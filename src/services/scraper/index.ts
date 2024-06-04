@@ -23,7 +23,7 @@ export default class Scraper {
         throw new Error("No website or events path provided");
       }
 
-      const url = `https://${venue.website}${venue?.eventsPath || ""}`;
+      const url = `https://${venue.website}/${venue?.eventsPath || ""}`;
       const page = await this.loadPage(url);
       const content = await page.content();
       const parsed = cheerio.load(content);
@@ -57,13 +57,13 @@ export default class Scraper {
 
       const page = await browser.newPage();
       await page.goto(url, {
-        waitUntil: "networkidle2",
+        waitUntil: "load",
       });
       // wait for extra js to load
       await wait(1000);
       return page;
     } catch (e) {
-      throw new Error("Error loading page to scrape");
+      console.error(`Error loading page to scrape: ${e}`);
     }
   }
 
@@ -73,7 +73,7 @@ export default class Scraper {
   ) {
     try {
       const res = await this.ai.chat.completions.create({
-        model: "gpt-4-0125-preview",
+        model: "gpt-4o",
         messages,
         tools: [
           {

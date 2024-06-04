@@ -13,19 +13,19 @@
   "license": "ISC",
   "devDependencies": {
     "@types/cheerio": "^0.22.35",
-    "@types/node": "^20.11.30",
+    "@types/node": "^20.14.0",
     "@types/node-cron": "^3.0.11",
     "envalid": "^8.0.0",
-    "typescript": "^5.4.3"
+    "typescript": "^5.4.5"
   },
   "dependencies": {
-    "@prisma/client": "^5.11.0",
+    "@prisma/client": "^5.14.0",
     "cheerio": "1.0.0-rc.12",
-    "dotenv-cli": "^7.4.1",
+    "dotenv-cli": "^7.4.2",
     "node-cron": "^3.0.3",
-    "openai": "^4.30.0",
-    "prisma": "^5.11.0",
-    "puppeteer-core": "^22.6.1",
+    "openai": "^4.47.3",
+    "prisma": "^5.14.0",
+    "puppeteer-core": "^22.10.0",
     "ts-node": "^10.9.2"
   }
 }

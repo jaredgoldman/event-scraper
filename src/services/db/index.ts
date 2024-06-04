@@ -18,8 +18,8 @@ export default class Database {
   /**
    * Process array of normalized events and save to db
    */
-  async processEvents(scrapedEvents: ScrapedEvent[]) {
-    const transactionData = [];
+  async processAndCreateEvents(scrapedEvents: ScrapedEvent[]) {
+    const transactionData: ScrapedEvent[] = [];
 
     for (const event of scrapedEvents) {
       const normalized = await this.checkForDuplicates(event);
@@ -35,15 +35,18 @@ export default class Database {
     }
 
     await this.prisma.$transaction([
-      ...transactionData.map((data) =>
-        this.prisma.event.create({
+      ...transactionData.map((data) => {
+        if (!data.artistId) throw new Error("Artist id not found");
+        return this.prisma.event.create({
           data: {
-            ...data,
+            name: data.artist,
+            startDate: new Date(data.startDate),
+            endDate: new Date(data.endDate),
             artist: { connect: { id: data.artistId } },
             venue: { connect: { id: data.venueId } },
           },
-        }),
-      ),
+        });
+      }),
     ]);
   }
 

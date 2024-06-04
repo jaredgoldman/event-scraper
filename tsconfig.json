@@ -7,7 +7,7 @@
     "sourceMap": true,
     "outDir": "dist",
     "paths": {
-      "~/types/*": ["./src/types"]
+      "~/types/*": ["./src/types"],
       "~/services/*": ["./src/services/*"]
     }
   },

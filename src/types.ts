@@ -4,4 +4,5 @@ export type ScrapedEvent = {
   startDate: string;
   endDate: string;
   venueId: string;
+  artistId?: string;
 };
