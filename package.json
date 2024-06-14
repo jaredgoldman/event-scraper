@@ -6,7 +6,9 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "db:generate": "dotenv -e .env -- prisma generate",
-    "db:push": "dotenv -e .env -- prisma db push"
+    "db:push": "prisma db push",
+    "db:reset": "dotenv -e .env -- prisma migrate reset --force --skip-seed && pnpm run db:push && pnpm run db:seed",
+    "db:seed": "ts-node src/scripts/seed.ts"
   },
   "keywords": [],
   "author": "",
@@ -16,16 +18,27 @@
     "@types/node": "^20.14.0",
     "@types/node-cron": "^3.0.11",
     "envalid": "^8.0.0",
+    "prisma": "^5.15.0",
     "typescript": "^5.4.5"
   },
   "dependencies": {
-    "@prisma/client": "^5.14.0",
+    "@langchain/community": "^0.2.9",
+    "@langchain/core": "^0.2.6",
+    "@langchain/openai": "^0.1.2",
+    "@langchain/textsplitters": "^0.0.3",
+    "@prisma/client": "^5.15.0",
     "cheerio": "1.0.0-rc.12",
     "dotenv-cli": "^7.4.2",
+    "html-to-text": "^9.0.5",
+    "htmlparser2": "^9.1.0",
+    "langchain": "^0.2.5",
     "node-cron": "^3.0.3",
     "openai": "^4.47.3",
-    "prisma": "^5.14.0",
-    "puppeteer-core": "^22.10.0",
-    "ts-node": "^10.9.2"
+    "pino": "^9.1.0",
+    "pino-pretty": "^11.1.0",
+    "puppeteer": "^22.10.0",
+    "ts-node": "^10.9.2",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.0"
   }
 }
