@@ -38,7 +38,7 @@ export const initLog = (): string => {
   const currentDate = new Date();
   return `
 ====================================================
-API Accounts now online
+Event Scraper now online
 ----------------------------------------------------
 Boot time:                ${process.uptime()}s
 Current Time:             ${currentDate.toLocaleString()}

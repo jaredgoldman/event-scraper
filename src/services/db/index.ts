@@ -1,5 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { ScrapedEvent } from "../../utils/validation";
+import {
+  PrismaClientKnownRequestError,
+  PrismaClientValidationError,
+} from "@prisma/client/runtime/library";
 import { Logger } from "../logger";
 import { z } from "zod";
 import { scrapedEventSchema } from "../../utils/validation";
@@ -19,6 +23,13 @@ export default class Database {
     this.prisma = prisma;
   }
 
+  async getVenues() {
+    return await this.prisma.venue.findMany({
+      where: {
+        crawlable: true,
+      },
+    });
+  }
   /**
    * Process array of normalized events and save to db
    */
@@ -62,6 +73,14 @@ export default class Database {
           });
         } catch (error) {
           // Log the error and continue
+          if (error instanceof PrismaClientKnownRequestError) {
+            Logger.info(
+              `Skipping duplicate event: ${data.eventName || data.artist}`,
+            );
+            return null;
+          } else if (error instanceof PrismaClientValidationError) {
+            throw new Error("Invalid data, throwing error");
+          }
           Logger.error(`Failed to create event: ${error}`);
           return null;
         }

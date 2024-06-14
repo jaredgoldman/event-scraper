@@ -10,7 +10,9 @@ import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
 import { pull } from "langchain/hub";
 import { ChatOpenAI } from "@langchain/openai";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
-import { extract } from "./messages";
+import extract from "./messages/extract";
+import { Logger } from "../logger";
+import refine from "./messages/refine";
 import { z } from "zod";
 
 export default class Scraper {
@@ -41,11 +43,26 @@ export default class Scraper {
   }
 
   public async getEvents(): Promise<ScrapedEvent[]> {
-    const transformer = new HtmlToTextTransformer();
+    Logger.info(`Conducting initial scraping ${this.venue.name}`);
+    return await this.parse();
+    // Logger.info(`Conducting refinement for ${this.venue.name}`);
+    // return await this.refine(initial);
+  }
+
+  async parse() {
+    const transformer = new HtmlToTextTransformer({
+      removeNewlines: true,
+      removeExtraWhitespace: true,
+      // tables: true,
+      removeHtmlTags: true,
+      removeHtmlComments: true,
+      uppercaseHeadings: false,
+    });
+
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: 4000,
       chunkOverlap: 100,
-      // We could get creative with the splitter here maybe?
+      // We could get creative with the splitter here in terms of filtering data
     });
     const docs = await this.loader.load();
     const sequence = transformer.pipe(splitter);
@@ -75,6 +92,7 @@ export default class Scraper {
       question: extract,
       context: retrievedDocs,
     });
+
     return response.map((r) => ({ ...r, venueId: this.venue.id }));
   }
 }
