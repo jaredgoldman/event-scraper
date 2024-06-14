@@ -1,5 +1,13 @@
-import { PrismaClient, Event } from "@prisma/client";
-import { ScrapedEvent } from "~/types/*";
+import { PrismaClient } from "@prisma/client";
+import { ScrapedEvent } from "../../utils/validation";
+import {
+  PrismaClientKnownRequestError,
+  PrismaClientValidationError,
+} from "@prisma/client/runtime/library";
+import { Logger } from "../logger";
+import { z } from "zod";
+import { scrapedEventSchema } from "../../utils/validation";
+import assert from "node:assert";
 
 /**
  * Class responsible for db interactions
@@ -15,6 +23,13 @@ export default class Database {
     this.prisma = prisma;
   }
 
+  async getVenues() {
+    return await this.prisma.venue.findMany({
+      where: {
+        crawlable: true,
+      },
+    });
+  }
   /**
    * Process array of normalized events and save to db
    */
@@ -22,32 +37,58 @@ export default class Database {
     const transactionData: ScrapedEvent[] = [];
 
     for (const event of scrapedEvents) {
-      const normalized = await this.checkForDuplicates(event);
+      try {
+        const validated = scrapedEventSchema.parse(event);
+        const normalized = await this.checkForDuplicates(validated);
 
-      if (!normalized) continue;
+        if (!normalized) {
+          Logger.info(`Skipping duplicate event: ${event.eventName}`);
+          continue;
+        }
 
-      const artist = await this.maybeCreateArtist(normalized);
+        const artist = await this.maybeCreateArtist(normalized);
 
-      transactionData.push({
-        ...normalized,
-        artistId: artist.id,
-      });
+        transactionData.push({
+          ...normalized,
+          artistId: artist.id,
+        });
+      } catch (e: unknown) {
+        Logger.error(`Error processing event: ${e}`);
+      }
     }
 
-    await this.prisma.$transaction([
-      ...transactionData.map((data) => {
-        if (!data.artistId) throw new Error("Artist id not found");
-        return this.prisma.event.create({
-          data: {
-            name: data.artist,
-            startDate: new Date(data.startDate),
-            endDate: new Date(data.endDate),
-            artist: { connect: { id: data.artistId } },
-            venue: { connect: { id: data.venueId } },
-          },
-        });
+    const txnResults = await Promise.all(
+      transactionData.map(async (data) => {
+        try {
+          assert(data.artistId, "Artist ID is required");
+
+          return await this.prisma.event.create({
+            data: {
+              name: data.eventName,
+              startDate: new Date(data.startDate),
+              endDate: new Date(data.endDate),
+              artist: { connect: { id: data.artistId } },
+              venue: { connect: { id: data.venueId } },
+            },
+          });
+        } catch (error) {
+          // Log the error and continue
+          if (error instanceof PrismaClientKnownRequestError) {
+            Logger.info(
+              `Skipping duplicate event: ${data.eventName || data.artist}`,
+            );
+            return null;
+          } else if (error instanceof PrismaClientValidationError) {
+            throw new Error("Invalid data, throwing error");
+          }
+          Logger.error(`Failed to create event: ${error}`);
+          return null;
+        }
       }),
-    ]);
+    );
+
+    // Filter out the null results
+    return txnResults.filter((result) => result !== null);
   }
 
   /**

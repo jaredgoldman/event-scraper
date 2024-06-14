@@ -4,6 +4,7 @@ type EnvConfig = {
   DATABASE_URL: string;
   OPENAI_API_KEY: string;
   OPENAI_ORG_ID: string;
+  ADMIN_EMAIL: string;
 };
 
 const env = envalid.cleanEnv(process.env, {
@@ -15,6 +16,9 @@ const env = envalid.cleanEnv(process.env, {
   }),
   OPENAI_ORG_ID: envalid.str({
     desc: "The open ai org id",
+  }),
+  ADMIN_EMAIL: envalid.str({
+    desc: "Email address for seed admin",
   }),
 });
 
