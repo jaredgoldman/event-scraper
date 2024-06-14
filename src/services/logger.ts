@@ -34,9 +34,9 @@ export class Logger {
   }
 }
 
-export const initLog = (): string => {
+export const initLog = () => {
   const currentDate = new Date();
-  return `
+  Logger.info(`
 ====================================================
 Event Scraper now online
 ----------------------------------------------------
@@ -45,5 +45,5 @@ Current Time:             ${currentDate.toLocaleString()}
 Current Time (ISO):       ${currentDate.toISOString()}
 Current Time (epoch, ms): ${currentDate.getTime()}
 ====================================================
-`;
+`);
 };

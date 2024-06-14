@@ -1,4 +1,4 @@
-// import cron from "node-cron";
+import cron from "node-cron";
 import { prisma } from "./config/db";
 import { wait, sendWithRetries } from "./utils";
 import Scraper from "./services/scraper";
@@ -7,11 +7,12 @@ import util from "util";
 import { Logger, initLog } from "./services/logger";
 import { Venue } from "@prisma/client";
 
-// cron.schedule("*/1 * * * *", async () => main(), {
-//   scheduled: true,
-// });
+cron.schedule("*/1 * * * *", async () => main(), {
+  scheduled: true,
+});
 
 const main = async () => {
+  initLog()
   const db = new Database(prisma);
 
   for (const venue of await db.getVenues()) {
@@ -37,7 +38,7 @@ const main = async () => {
     }
   }
   Logger.info("Scraping complete");
-  // process.exit();
+  process.exit();
 };
 
 const extractAndStoreEvents = async (venue: Venue, db: Database) => {
@@ -48,10 +49,3 @@ const extractAndStoreEvents = async (venue: Venue, db: Database) => {
   return await db.processAndCreateEvents(events);
 };
 
-(async () => {
-  Logger.info(initLog());
-  while (true) {
-    await main();
-  }
-})();
-// process.stdin.resume();
