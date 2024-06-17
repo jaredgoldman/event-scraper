@@ -5,9 +5,9 @@ import {
   PrismaClientValidationError,
 } from "@prisma/client/runtime/library";
 import { Logger } from "../logger";
-import { z } from "zod";
 import { scrapedEventSchema } from "../../utils/validation";
 import assert from "node:assert";
+import { DateTime } from "luxon";
 
 /**
  * Class responsible for db interactions
@@ -62,11 +62,19 @@ export default class Database {
         try {
           assert(data.artistId, "Artist ID is required");
 
+          const startDate = DateTime.fromISO(data.startDate)
+            .setZone("America/New_York")
+            .toJSDate();
+
+          const endDate = DateTime.fromISO(data.endDate)
+            .setZone("America/New_York")
+            .toJSDate();
+
           return await this.prisma.event.create({
             data: {
-              name: data.eventName,
-              startDate: new Date(data.startDate),
-              endDate: new Date(data.endDate),
+              name: data.eventName ?? "",
+              startDate,
+              endDate,
               artist: { connect: { id: data.artistId } },
               venue: { connect: { id: data.venueId } },
             },
@@ -99,7 +107,7 @@ export default class Database {
    */
   private async checkForDuplicates(
     scrapedEvent: ScrapedEvent,
-  ): Promise<ScrapedEvent> {
+  ): Promise<ScrapedEvent | undefined> {
     const existingEvent = await this.prisma.event.findUnique({
       where: {
         startDate_venueId: {

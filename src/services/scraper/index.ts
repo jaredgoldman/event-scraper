@@ -3,26 +3,30 @@ import { HtmlToTextTransformer } from "@langchain/community/document_transformer
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { Venue } from "@prisma/client";
 import { wait, scrapedEventSchema, ScrapedEvent } from "../../utils";
-import { OpenAIEmbeddings } from "@langchain/openai";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
 import { pull } from "langchain/hub";
-import { ChatOpenAI } from "@langchain/openai";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import extract from "./messages/extract";
 import { Logger } from "../logger";
-import refine from "./messages/refine";
 import { z } from "zod";
+import { Ai, getAi, getEmbeddings, Embeddings } from "../../utils/ai";
 
 export default class Scraper {
   private venue: Venue;
   private loader: PuppeteerWebBaseLoader;
   private eventSchema = scrapedEventSchema;
+  private embeddings: Embeddings;
+  private ai: Ai;
 
   constructor(venue: Venue) {
     this.venue = venue;
+    this.ai = getAi();
+    this.embeddings = getEmbeddings();
+
     const eventsUrl = `https://${venue.website}/${venue.eventsPath}`;
+
     this.loader = new PuppeteerWebBaseLoader(eventsUrl, {
       launchOptions: {
         headless: true,
@@ -53,14 +57,13 @@ export default class Scraper {
     const transformer = new HtmlToTextTransformer({
       removeNewlines: true,
       removeExtraWhitespace: true,
-      // tables: true,
       removeHtmlTags: true,
       removeHtmlComments: true,
       uppercaseHeadings: false,
     });
 
     const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 4000,
+      chunkSize: 900,
       chunkOverlap: 100,
       // We could get creative with the splitter here in terms of filtering data
     });
@@ -69,19 +72,15 @@ export default class Scraper {
     const newDocuments = await sequence.invoke(docs);
     const vectorStore = await MemoryVectorStore.fromDocuments(
       newDocuments,
-      new OpenAIEmbeddings(),
+      this.embeddings,
     );
     const retriever = vectorStore.asRetriever();
     const prompt = await pull<ChatPromptTemplate>("rlm/rag-prompt");
-    const llm = new ChatOpenAI({
-      model: "gpt-4o",
-      temperature: 0,
-    });
 
     const ragChain = await createStuffDocumentsChain<
       z.infer<typeof this.eventSchema>[]
     >({
-      llm,
+      llm: this.ai,
       prompt,
       outputParser: new JsonOutputParser(),
     });

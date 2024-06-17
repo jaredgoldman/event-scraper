@@ -5,6 +5,7 @@ type EnvConfig = {
   OPENAI_API_KEY: string;
   OPENAI_ORG_ID: string;
   ADMIN_EMAIL: string;
+  AI_PROVIDER: string
 };
 
 const env = envalid.cleanEnv(process.env, {
@@ -20,6 +21,10 @@ const env = envalid.cleanEnv(process.env, {
   ADMIN_EMAIL: envalid.str({
     desc: "Email address for seed admin",
   }),
+  AI_PROVIDER: envalid.str({
+    desc: "The AI model to use",
+    choices: ["OPENAI", "GROQ"],
+  })
 });
 
 export default env as EnvConfig;

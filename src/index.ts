@@ -7,14 +7,24 @@ import util from "util";
 import { Logger, initLog } from "./services/logger";
 import { Venue } from "@prisma/client";
 
-cron.schedule("*/1 * * * *", async () => main(), {
-  scheduled: true,
-});
+// cron.schedule(
+//   "*/10 * * * *",
+//   async () => {
+//     initLog();
+//     const db = new Database(prisma);
+//     await main(db);
+//   },
+//   {
+//     scheduled: true,
+//   },
+// );
 
-const main = async () => {
-  initLog()
+const run = async () => {
   const db = new Database(prisma);
+  await main(db);
+};
 
+const main = async (db: Database) => {
   for (const venue of await db.getVenues()) {
     try {
       const processedEvents = await sendWithRetries(() =>
@@ -38,7 +48,6 @@ const main = async () => {
     }
   }
   Logger.info("Scraping complete");
-  process.exit();
 };
 
 const extractAndStoreEvents = async (venue: Venue, db: Database) => {
@@ -49,3 +58,4 @@ const extractAndStoreEvents = async (venue: Venue, db: Database) => {
   return await db.processAndCreateEvents(events);
 };
 
+run();
