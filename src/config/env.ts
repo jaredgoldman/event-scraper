@@ -5,7 +5,11 @@ type EnvConfig = {
   OPENAI_API_KEY: string;
   OPENAI_ORG_ID: string;
   ADMIN_EMAIL: string;
-  AI_PROVIDER: string
+  AI_PROVIDER: string;
+  DEBUG_LEVEL: string;
+  CRON_SCHEDULE: string;
+  NODE_ENV: string;
+  CHUNK_LIMIT: number;
 };
 
 const env = envalid.cleanEnv(process.env, {
@@ -23,8 +27,26 @@ const env = envalid.cleanEnv(process.env, {
   }),
   AI_PROVIDER: envalid.str({
     desc: "The AI model to use",
-    choices: ["OPENAI", "GROQ"],
-  })
+    choices: ["OPENAI", "GROQ", "COHERE"],
+  }),
+  DEBUG_LEVEL: envalid.str({
+    desc: "The debug level",
+    choices: ["info", "warn", "error", "debug"],
+    default: "info",
+  }),
+  CRON_SCHEDULE: envalid.str({
+    desc: "The schedule for the chron job",
+    default: "0 0 * * *",
+  }),
+  CHUNK_LIMIT: envalid.num({
+    desc: "The amount of chunks we want to send to llm",
+    default: 100,
+  }),
+  NODE_ENV: envalid.str({
+    desc: "The node environment",
+    choices: ["development", "production", "test"],
+    default: "development",
+  }),
 });
 
 export default env as EnvConfig;
