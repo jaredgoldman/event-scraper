@@ -1,13 +1,14 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Venue } from "@prisma/client";
 import { ScrapedEvent } from "../../utils/validation";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
 } from "@prisma/client/runtime/library";
-import { Logger } from "../logger";
-import { z } from "zod";
+import { logger } from "../logger";
 import { scrapedEventSchema } from "../../utils/validation";
 import assert from "node:assert";
+import { DateTime } from "luxon";
+import env from "../../config/env";
 
 /**
  * Class responsible for db interactions
@@ -23,10 +24,34 @@ export default class Database {
     this.prisma = prisma;
   }
 
+  /**
+   * Fetch venues that are crawlable
+   */
   async getVenues() {
     return await this.prisma.venue.findMany({
       where: {
         crawlable: true,
+      },
+    });
+  }
+
+  /**
+   * Get events for the current month
+   */
+  async getEventsThisMonthByVenue(venue: Venue) {
+    return await this.prisma.event.findMany({
+      where: {
+        startDate: {
+          gte: DateTime.now()
+            .setZone("America/Toronto")
+            .startOf("month")
+            .toJSDate(),
+          lte: DateTime.now()
+            .setZone("America/Toronto")
+            .endOf("month")
+            .toJSDate(),
+        },
+        venueId: venue.id,
       },
     });
   }
@@ -35,14 +60,33 @@ export default class Database {
    */
   async processAndCreateEvents(scrapedEvents: ScrapedEvent[]) {
     const transactionData: ScrapedEvent[] = [];
+    const variousArtist = await this.prisma.artist.findUnique({
+      where: { name: "Various" },
+    });
+
+    if (!variousArtist) {
+      throw new Error("Various artist not found");
+    }
 
     for (const event of scrapedEvents) {
+      let normalized: ScrapedEvent;
       try {
         const validated = scrapedEventSchema.parse(event);
-        const normalized = await this.checkForDuplicates(validated);
+
+        if (!validated?.endDate) {
+          validated.endDate = DateTime.fromISO(validated.startDate)
+            .plus({
+              hours: 2,
+            })
+            .toISO();
+        }
+
+        normalized = await this.checkForDuplicates(validated);
 
         if (!normalized) {
-          Logger.info(`Skipping duplicate event: ${event.eventName}`);
+          logger.debug(
+            `Skipping duplicate event: ${event.eventName ? event.eventName : event.artist}`,
+          );
           continue;
         }
 
@@ -53,38 +97,64 @@ export default class Database {
           artistId: artist.id,
         });
       } catch (e: unknown) {
-        Logger.error(`Error processing event: ${e}`);
+        if (event.eventName && !event.artist) {
+          /*
+           * If we have an event name but no artist, we can assume it's a
+           * various event
+           */
+          transactionData.push({ ...normalized, artistId: variousArtist.id });
+        } else {
+          logger.error(`Error processing event: ${e}`, event);
+        }
       }
     }
 
     const txnResults = await Promise.all(
-      transactionData.map(async (data) => {
-        try {
-          assert(data.artistId, "Artist ID is required");
+      transactionData
+        .map(async (data) => {
+          try {
+            assert(data.artistId, "Artist ID is required");
 
-          return await this.prisma.event.create({
-            data: {
-              name: data.eventName,
-              startDate: new Date(data.startDate),
-              endDate: new Date(data.endDate),
-              artist: { connect: { id: data.artistId } },
-              venue: { connect: { id: data.venueId } },
-            },
-          });
-        } catch (error) {
-          // Log the error and continue
-          if (error instanceof PrismaClientKnownRequestError) {
-            Logger.info(
-              `Skipping duplicate event: ${data.eventName || data.artist}`,
+            const startDate = DateTime.fromISO(data.startDate).setZone(
+              "America/Toronto",
             );
+
+            const endDate = DateTime.fromISO(data.endDate).setZone(
+              "America/Toronto",
+            );
+
+            if (startDate < DateTime.now()) {
+              logger.debug(
+                `Skipping event in the past: ${data.eventName || data.artist}`,
+              );
+              return null;
+            }
+
+            return await this.prisma.event.create({
+              data: {
+                name: data.eventName ?? "",
+                startDate: startDate.toJSDate(),
+                endDate: endDate.toJSDate(),
+                artist: { connect: { id: data.artistId } },
+                venue: { connect: { id: data.venueId } },
+                approved: !Boolean(env.NODE_ENV === "development"),
+              },
+            });
+          } catch (error) {
+            // Log the error and continue
+            if (error instanceof PrismaClientKnownRequestError) {
+              logger.debug(
+                `Skipping duplicate event: ${data.eventName || data.artist}`,
+              );
+              return null;
+            } else if (error instanceof PrismaClientValidationError) {
+              throw new Error("Invalid data, throwing error");
+            }
+            logger.error(`Failed to create event: ${error}`);
             return null;
-          } else if (error instanceof PrismaClientValidationError) {
-            throw new Error("Invalid data, throwing error");
           }
-          Logger.error(`Failed to create event: ${error}`);
-          return null;
-        }
-      }),
+        })
+        .filter(Boolean),
     );
 
     // Filter out the null results
@@ -99,7 +169,7 @@ export default class Database {
    */
   private async checkForDuplicates(
     scrapedEvent: ScrapedEvent,
-  ): Promise<ScrapedEvent> {
+  ): Promise<ScrapedEvent | undefined> {
     const existingEvent = await this.prisma.event.findUnique({
       where: {
         startDate_venueId: {

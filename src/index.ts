@@ -1,51 +1,89 @@
 import cron from "node-cron";
 import { prisma } from "./config/db";
-import { wait, sendWithRetries } from "./utils";
+import { wait } from "./utils";
 import Scraper from "./services/scraper";
 import Database from "./services/db";
 import util from "util";
-import { Logger, initLog } from "./services/logger";
-import { Venue } from "@prisma/client";
+import { logger, initLog } from "./services/logger";
+import { Venue, Event } from "@prisma/client";
+import env from "./config/env";
 
-cron.schedule("*/1 * * * *", async () => main(), {
-  scheduled: true,
-});
+const db = new Database(prisma);
+initLog();
 
 const main = async () => {
-  initLog()
-  const db = new Database(prisma);
+  await scrapeAndProcess(db);
+};
 
+/**
+ * Scrape and process events for all venues
+ * @param {Database} db
+ */
+const scrapeAndProcess = async (db: Database) => {
+  let processedEventCount = 0;
   for (const venue of await db.getVenues()) {
+    logger.info(`scraping events for ${venue.name}`);
     try {
-      const processedEvents = await sendWithRetries(() =>
-        extractAndStoreEvents(venue, db),
+      const events = await db.getEventsThisMonthByVenue(venue);
+      const processedEvents = await extractAndStoreEvents(venue, db, events);
+      logger.debug(
+        `scraped ${processedEvents.length} events from ${venue.name}`,
       );
+      processedEventCount += processedEvents.length;
       await wait(5000);
       if (processedEvents.length === 0) {
-        Logger.warn(`No events found for ${venue.name}`);
+        logger.warn(`No events found for ${venue.name}`);
         continue;
       } else {
-        Logger.info(
-          `processed and stored ${processedEvents.length} events for ${venue.name}, waiting 5s`,
+        logger.info(
+          `${processedEvents.length} events processed for for ${venue.name}`,
         );
       }
     } catch (e: unknown) {
-      Logger.error(
+      logger.error(
         `Error scraping events for ${venue.name}.`,
         util.inspect(e, false, null, true),
       );
       continue;
     }
   }
-  Logger.info("Scraping complete");
-  process.exit();
+  logger.info(
+    `All venues scraped, ${processedEventCount} events added going back to sleep..💤`,
+  );
 };
 
-const extractAndStoreEvents = async (venue: Venue, db: Database) => {
-  const scraper = new Scraper(venue);
-  Logger.info(`scraping events for ${venue.name}`);
+/**
+ * Extract and store events for a venue
+ * @param {Venue} venue
+ * @param {Database} db
+ * @param {Event[]} eventsThisMonth
+ */
+const extractAndStoreEvents = async (
+  venue: Venue,
+  db: Database,
+  eventsThisMonth: Event[],
+) => {
+  const scraper = new Scraper(venue, eventsThisMonth);
   const events = await scraper.getEvents();
-  Logger.info(`scraped ${events.length} events from ${venue.name}`);
+  if (!Array.isArray(events)) {
+    logger.error("Invalid data, expected array", events);
+    return [];
+  }
+  logger.debug(
+    `Scraped ${events.length} events for ${venue.name}: ${util.inspect(events, false, null, true)}`,
+  );
   return await db.processAndCreateEvents(events);
 };
 
+switch (env.NODE_ENV) {
+  case "production":
+    cron.schedule(env.CRON_SCHEDULE, async () => await main(), {
+      scheduled: true,
+    });
+    break;
+  case "test":
+  case "development":
+    while (true) {
+      await main();
+    }
+}

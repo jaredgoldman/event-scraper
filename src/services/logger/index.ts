@@ -1,4 +1,6 @@
 import pino from "pino";
+import env from "../../config/env";
+import { DateTime } from "luxon";
 
 const pinoLogger = pino(
   {
@@ -7,7 +9,7 @@ const pinoLogger = pino(
         return { level: label };
       },
     },
-    level: "debug",
+    level: env.DEBUG_LEVEL,
   },
   pino.transport({
     target: "pino-pretty",
@@ -19,7 +21,7 @@ const pinoLogger = pino(
   }),
 );
 
-export class Logger {
+class Logger {
   public static info(message: string, obj?: any): void {
     obj ? pinoLogger.info(obj, message) : pinoLogger.info(message);
   }
@@ -34,16 +36,18 @@ export class Logger {
   }
 }
 
+export const logger = Logger;
+
 export const initLog = () => {
-  const currentDate = new Date();
+  const currentDate = DateTime.now();
   Logger.info(`
 ====================================================
 Event Scraper now online
 ----------------------------------------------------
 Boot time:                ${process.uptime()}s
-Current Time:             ${currentDate.toLocaleString()}
-Current Time (ISO):       ${currentDate.toISOString()}
-Current Time (epoch, ms): ${currentDate.getTime()}
+Current Time (ISO):       ${currentDate.toFormat("yyyy-MM-dd HH:mm:ss")}
+AI Provider:              ${env.AI_PROVIDER}
+Debug Level               ${env.DEBUG_LEVEL}
 ====================================================
 `);
 };
