@@ -34,7 +34,7 @@ export default class Scraper {
   private embeddings: Embeddings;
   private ai: Ai;
   private chunkSize = 4000;
-  private ragChain: RunnableSequence;
+  private ragChain: RunnableSequence | null = null;
 
   /**
    * @param {Venue} venue - The venue to scrape.
@@ -80,7 +80,7 @@ export default class Scraper {
   /**
    * Parse the HTML content of the venue's events page to extract structured data.
    */
-  private async parse() {
+  private async parse(): Promise<ScrapedEvent[]> {
     const docs = await this.loader.load();
     const newDocuments = await this.transformHtmlToText(docs);
     logger.debug(`Generated ${newDocuments.length} documents`);
@@ -94,7 +94,7 @@ export default class Scraper {
     logger.debug(
       `Retrieved ${retrievedDocs.length} documents: ${util.inspect(retrievedDocs, { depth: null })}`,
     );
-    const response = await this.callRagChain(retrievedDocs);
+    const response = (await this.callRagChain(retrievedDocs)) ?? [];
     return response.map((r) => ({ ...r, venueId: this.venue.id }));
   }
 
@@ -102,7 +102,9 @@ export default class Scraper {
    * Call the RagChain to extract structured data from the retrieved documents.
    * @param {DocumentInterface<Record<string, any>>[]} context - The context documents to provide to the RagChain.
    */
-  async callRagChain(context: DocumentInterface<Record<string, any>>[]) {
+  async callRagChain(
+    context: DocumentInterface<Record<string, any>>[],
+  ): Promise<ScrapedEvent[] | undefined> {
     const events = this.eventsThisMonth.map((event) => ({
       ...event,
       venueName: this.venue.name,

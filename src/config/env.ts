@@ -10,6 +10,7 @@ type EnvConfig = {
   CRON_SCHEDULE: string;
   NODE_ENV: string;
   CHUNK_LIMIT: number;
+  SCHEDULE_CHRON: boolean;
 };
 
 /**
@@ -50,6 +51,10 @@ const env = envalid.cleanEnv(process.env, {
     desc: "The node environment",
     choices: ["development", "production", "test"],
     default: "development",
+  }),
+  SCHEDULE_CHRON: envalid.bool({
+    desc: "Whether to schedule the chron job",
+    default: false,
   }),
 });
 

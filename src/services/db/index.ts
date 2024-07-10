@@ -69,7 +69,7 @@ export default class Database {
     }
 
     for (const event of scrapedEvents) {
-      let normalized: ScrapedEvent;
+      let normalized: ScrapedEvent | undefined;
       try {
         const validated = scrapedEventSchema.parse(event);
 
@@ -78,7 +78,7 @@ export default class Database {
             .plus({
               hours: 2,
             })
-            .toISO();
+            .toISO() as string;
         }
 
         normalized = await this.checkForDuplicates(validated);
@@ -97,7 +97,7 @@ export default class Database {
           artistId: artist.id,
         });
       } catch (e: unknown) {
-        if (event.eventName && !event.artist) {
+        if (event.eventName && !event.artist && normalized) {
           /*
            * If we have an event name but no artist, we can assume it's a
            * various event
@@ -119,9 +119,9 @@ export default class Database {
               "America/Toronto",
             );
 
-            const endDate = DateTime.fromISO(data.endDate).setZone(
-              "America/Toronto",
-            );
+            const endDate = data.endDate
+              ? DateTime.fromISO(data.endDate).setZone("America/Toronto")
+              : startDate.plus({ hours: 2 });
 
             if (startDate < DateTime.now()) {
               logger.debug(

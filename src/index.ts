@@ -11,8 +11,12 @@ import env from "./config/env";
 const db = new Database(prisma);
 initLog();
 
+/**
+ * Main function
+ */
 const main = async () => {
   await scrapeAndProcess(db);
+  process.exit(0);
 };
 
 /**
@@ -77,9 +81,13 @@ const extractAndStoreEvents = async (
 
 switch (env.NODE_ENV) {
   case "production":
-    cron.schedule(env.CRON_SCHEDULE, async () => await main(), {
-      scheduled: true,
-    });
+    if (env.SCHEDULE_CHRON) {
+      cron.schedule(env.CRON_SCHEDULE, async () => await main(), {
+        scheduled: true,
+      });
+    } else {
+      main();
+    }
     break;
   case "test":
   case "development":

@@ -10,8 +10,8 @@
     "db:generate": "dotenv -e .env -- prisma generate",
     "db:push": "prisma db push",
     "db:reset": "dotenv -e .env -- prisma migrate reset --force --skip-seed && pnpm run db:push && pnpm run db:seed",
-    "db:seed": "ts-node src/scripts/seed.ts"
-    "db:setup": "dotenv -e .env -- prisma migrate dev --name init --create-db --skip-seed && pnpm run db:push && pnpm run db:seed",
+    "db:seed": "ts-node src/scripts/seed.ts",
+    "db:setup": "dotenv -e .env -- prisma migrate dev --name init --create-db --skip-seed && pnpm run db:push && pnpm run db:seed"
   },
   "keywords": [],
   "author": "",
@@ -40,7 +40,6 @@
     "cheminfo-types": "^1.7.3",
     "dotenv-cli": "^7.4.2",
     "html-to-text": "^9.0.5",
-    "htmlparser2": "^9.1.0",
     "jsdom": "^24.1.0",
     "langchain": "^0.2.5",
     "luxon": "^3.4.4",
@@ -50,7 +49,6 @@
     "pino-pretty": "^11.2.1",
     "puppeteer": "^22.11.0",
     "ts-node": "^10.9.2",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.23.0"
+    "zod": "^3.23.8"
   }
 }
