@@ -12,6 +12,14 @@ To install the necessary dependencies, run:
 pnpm i
 ```
 
+## Database
+
+The service uses a PostgreSQL database to store event information. The database connection is managed using Prisma ORM. To set up the database, run the following command:
+
+```bash
+pnpm run db:setup
+```
+
 ## Configuration
 
 Configuration settings are managed through environment variables. Take a look at `/src/config/env.ts` to see the available configuration options.
