@@ -12,6 +12,10 @@ type EnvConfig = {
   CHUNK_LIMIT: number;
 };
 
+/**
+ * Validate and return the environment variables.
+ * @returns {EnvConfig} - The environment variables.
+ */
 const env = envalid.cleanEnv(process.env, {
   DATABASE_URL: envalid.str({
     desc: "The database url",

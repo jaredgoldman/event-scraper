@@ -22,6 +22,10 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import util from "util";
 import { DocumentInterface } from "@langchain/core/documents";
 
+/**
+ * A scraper that extracts structured data from a venue's events page.
+ * @class
+ */
 export default class Scraper {
   private venue: Venue;
   private eventsThisMonth: Event[];
@@ -32,6 +36,14 @@ export default class Scraper {
   private chunkSize = 4000;
   private ragChain: RunnableSequence;
 
+  /**
+   * @param {Venue} venue - The venue to scrape.
+   * @param {Event[]} eventsThisMonth - The events that have already been scraped for this month.
+   * @param {Ai} ai - The AI to use for processing the scraped data.
+   * @param {Embeddings} embeddings - The embeddings to use for processing the scraped data.
+   * @param {number} chunkSize - The size of the chunks to split the text into.
+   * @param {RunnableSequence} ragChain - The RagChain to use for processing the scraped data.
+   */
   constructor(venue: Venue, eventsThisMonth: Event[]) {
     const { ai, embeddings, chunkSize } = getAiStuff();
     this.venue = venue;
@@ -57,10 +69,17 @@ export default class Scraper {
     });
   }
 
+  /**
+   * Scrape the venue's events page and return structured data.
+   * @returns {Promise<ScrapedEvent[]>} - The structured data of the venue's events.
+   */
   public async getEvents(): Promise<ScrapedEvent[]> {
     return (await this.parse()) ?? [];
   }
 
+  /**
+   * Parse the HTML content of the venue's events page to extract structured data.
+   */
   private async parse() {
     const docs = await this.loader.load();
     const newDocuments = await this.transformHtmlToText(docs);
@@ -81,6 +100,7 @@ export default class Scraper {
 
   /**
    * Call the RagChain to extract structured data from the retrieved documents.
+   * @param {DocumentInterface<Record<string, any>>[]} context - The context documents to provide to the RagChain.
    */
   async callRagChain(context: DocumentInterface<Record<string, any>>[]) {
     const events = this.eventsThisMonth.map((event) => ({
@@ -123,7 +143,7 @@ export default class Scraper {
           return await this.ragChain.invoke({
             instructions: `Your last response gave me unparsable, can you try again?`,
             context,
-            events
+            events,
           });
         } catch (e: unknown) {
           logger.error("Error recovering from JSON syntax error", e);
@@ -138,7 +158,7 @@ export default class Scraper {
   /**
    * Use the HtmlToTextTransformer or custom util to convert HTML content to plain text.
    */
-  private async transformHtmlToText(docs: any[]) {
+  private async transformHtmlToText(docs: DocumentInterface[]) {
     for (let doc of docs) {
       doc.pageContent = cleanHtml(doc.pageContent);
     }

@@ -21,6 +21,10 @@ const pinoLogger = pino(
   }),
 );
 
+/**
+ * Logger class for logging
+ * @class
+ */
 class Logger {
   public static info(message: string, obj?: any): void {
     obj ? pinoLogger.info(obj, message) : pinoLogger.info(message);
