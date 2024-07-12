@@ -4,6 +4,9 @@ type EnvConfig = {
   DATABASE_URL: string;
   OPENAI_API_KEY: string;
   OPENAI_ORG_ID: string;
+  GROQ_API_KEY: string;
+  COHERE_API_KEY: string;
+  MISTRAL_API_KEY: string;
   ADMIN_EMAIL: string;
   AI_PROVIDER: string;
   DEBUG_LEVEL: string;
@@ -26,6 +29,15 @@ const env = envalid.cleanEnv(process.env, {
   }),
   OPENAI_ORG_ID: envalid.str({
     desc: "The open ai org id",
+  }),
+  GROQ_API_KEY: envalid.str({
+    desc: "The groq api key",
+  }),
+  COHERE_API_KEY: envalid.str({
+    desc: "The cohere api key",
+  }),
+  MISTRAL_API_KEY: envalid.str({
+    desc: "The mistral api key",
   }),
   ADMIN_EMAIL: envalid.str({
     desc: "Email address for seed admin",

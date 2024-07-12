@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { prisma } from "./config/db.js";
+import { prisma } from "./config/db";
 import { wait } from "./utils";
 import Scraper from "./services/scraper";
 import Database from "./services/db";
@@ -86,7 +86,7 @@ switch (env.NODE_ENV) {
         scheduled: true,
       });
     } else {
-      main();
+      main;
     }
     break;
   case "test":
