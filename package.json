@@ -11,7 +11,7 @@
     "db:generate": "dotenv -e .env -- prisma generate",
     "db:push": "prisma db push",
     "db:reset": "dotenv -e .env -- prisma migrate reset --force --skip-seed && pnpm run db:push && pnpm run db:seed",
-    "db:seed": "ts-node src/scripts/seed.ts",
+    "db:seed": "ts-node src/scripts/seed.ts"
   },
   "keywords": [],
   "author": "",
