@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-specifier-resolution=node dist/index.js",
-    "build": "pnpm i && pnpm run db:generate && tsc",
+    "build": "pnpm i && tsc && pnpm run db:generate",
     "dev": "nodemon --exec ts-node src/index.ts",
     "db:generate": "dotenv -e .env -- prisma generate",
     "db:push": "prisma db push",
