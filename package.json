@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "start": "node dist/index.js",
+    "start": "node --experimental-specifier-resolution=node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
     "db:generate": "dotenv -e .env -- prisma generate",
     "db:push": "prisma db push",

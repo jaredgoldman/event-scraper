@@ -154,6 +154,7 @@ export default class Scraper {
       } else {
         logger.error(`Error events for ${this.venue.name}: ${e}`);
       }
+      return undefined
     }
   }
 
