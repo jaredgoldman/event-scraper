@@ -193,12 +193,12 @@ export default class Database {
       }
       // if event name is different, deactive previous event
       // and create new one
-      else {
-        await this.prisma.event.update({
-          where: { id: existingEvent.id },
-          data: { cancelled: true },
-        });
-      }
+      // else {
+      //   await this.prisma.event.update({
+      //     where: { id: existingEvent.id },
+      //     data: { cancelled: true },
+      //   });
+      // }
     }
 
     return scrapedEvent;

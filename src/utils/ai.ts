@@ -19,7 +19,7 @@ export const getAiStuff = (): {
     case "OPENAI":
       return {
         ai: new ChatOpenAI({
-          temperature: 1,
+          temperature: 0.1,
           modelName: "gpt-4o",
         }),
         embeddings: new OpenAIEmbeddings(),

@@ -1,4 +1,3 @@
-
 {
   "compilerOptions": {
     "outDir": "./dist",
@@ -7,9 +6,9 @@
     "target": "es6",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts", "dist", "src/scripts"]
 }
-

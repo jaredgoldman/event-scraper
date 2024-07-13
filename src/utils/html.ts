@@ -3,7 +3,7 @@ import cheerio from "cheerio";
 
 export const cleanHtml = (html: string): string => {
   // Load the HTML into cheerio
-  const $ = (cheerio).load(html);
+  const $ = cheerio.load(html);
 
   // Remove <script>, <style>, and <svg> tags and their content
   $("script, style, svg").remove();
@@ -12,7 +12,7 @@ export const cleanHtml = (html: string): string => {
   $("*")
     .contents()
     .each(function () {
-      if (this.type as string === "comment") {
+      if (this.type === "comment") {
         $(this).remove();
       }
     });
@@ -21,7 +21,7 @@ export const cleanHtml = (html: string): string => {
   $("*")
     .not("table, thead, tbody, tfoot, tr, th, td")
     .filter(function () {
-      return $(this as any).text().trim() === "";
+      return $(this).text().trim() === "";
     })
     .remove();
 
@@ -29,20 +29,20 @@ export const cleanHtml = (html: string): string => {
   $("*")
     .not("table, thead, tbody, tfoot, tr, th, td")
     .each(function () {
-      const text = $(this as any).text();
+      const text = $(this).text();
       $(this).text(text.replace(/\n/g, ""));
     });
 
   // Clean up specific attributes that are often unnecessary, but preserve table structure
   $("*")
     .not("table, thead, tbody, tfoot, tr, th, td")
-    .removeAttr("style")
-    .removeAttr("class")
-    .removeAttr("id");
+    .each(function () {
+      $(this).removeAttr("style").removeAttr("class").removeAttr("id");
+    });
 
   // Extract the cleaned HTML
   const cleanedHtml = $.html();
 
   return cleanedHtml;
-}
-;
+};
+
