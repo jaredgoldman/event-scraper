@@ -4,8 +4,7 @@ import venues from "./data/venues.json";
 
 const main = async () => {
   console.info("seeding database 🌱");
-  const added =await prisma.venue.createMany({ data: venues });
-  console.log(added)
+  await prisma.venue.createMany({ data: venues });
   await prisma.admin.create({
     data: {
       email: env.ADMIN_EMAIL,

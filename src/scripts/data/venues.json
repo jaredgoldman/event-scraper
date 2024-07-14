@@ -8,7 +8,7 @@
     "latitude": 43.6509,
     "longitude": -79.3883,
     "crawlable": true,
-    "eventsPath": "/events",
+    "eventsPath": "events",
     "phoneNumber": "416-598-2475",
     "facebookLink": "https://www.facebook.com/therextoronto",
     "approved": true
@@ -22,7 +22,7 @@
     "latitude": 43.6479,
     "longitude": -79.4004,
     "crawlable": true,
-    "eventsPath": "/events-9O8Cm",
+    "eventsPath": "events-9O8Cm",
     "phoneNumber": "416-598-2475",
     "facebookLink": "https://www.facebook.com/dromtaberna",
     "approved": true
@@ -36,7 +36,7 @@
     "latitude": 43.6559,
     "longitude": -79.3794,
     "crawlable": true,
-    "eventsPath": "/performance_calendar",
+    "eventsPath": "event-calendar",
     "phoneNumber": "416-363-5299",
     "facebookLink": "https://www.facebook.com/JazzBistroTO",
     "approved": true
@@ -50,7 +50,7 @@
     "latitude": 43.6559,
     "longitude": -79.3794,
     "crawlable": true,
-    "eventsPath": "/events",
+    "eventsPath": "events-2023",
     "phoneNumber": "416-792-4497",
     "facebookLink": "https://www.facebook.com/TheEmmetRay",
     "approved": true
@@ -63,8 +63,8 @@
     "website": "reservoirlounge.com",
     "latitude": 43.6486,
     "longitude": -79.3754,
-    "crawlable": true,
-    "eventsPath": "/live-shows",
+    "crawlable": false,
+    "eventsPath": "live-shows",
     "phoneNumber": "416-955-0887",
     "facebookLink": "https://www.facebook.com/ReservoirLounge",
     "approved": true
@@ -79,7 +79,7 @@
     "latitude": 43.6709,
     "longitude": -79.3914,
     "crawlable": true,
-    "eventsPath": "/happening-at-the-pilot",
+    "eventsPath": "happening-at-the-pilot",
     "phoneNumber": "416-923-5716",
     "facebookLink": "https://www.facebook.com/ThePilotTO",
     "approved": true
@@ -93,7 +93,7 @@
     "website": "hirutjazz.ca",
     "latitude": 43.6849,
     "longitude": -79.3174,
-    "crawlable": true,
+    "crawlable": false,
     "eventsPath": "/copy-of-live-shows",
     "phoneNumber": "416-551-7560",
     "facebookLink": "https://www.facebook.com/Hirut-Cafe-102171111218",

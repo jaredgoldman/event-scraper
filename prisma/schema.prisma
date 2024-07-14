@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -33,56 +33,58 @@ model Artist {
   events          Event[]
   active          Boolean  @default(true)
   description     String?
-  approved        Boolean @default(false)
+  approved        Boolean  @default(false)
 
   @@index([featured, name])
 }
 
 model Venue {
-  id              String      @id @default(cuid())
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   name            String
   address         String
   city            String
   photoPath       String?
   photoName       String?
-  featured        Boolean     @default(false)
+  featured        Boolean  @default(false)
   instagramHandle String?
   facebookLink    String?
   website         String
   phoneNumber     String
   events          Event[]
-  active          Boolean     @default(true)
+  active          Boolean  @default(true)
   latitude        Float
   longitude       Float
-  crawlable       Boolean     @default(false)
+  crawlable       Boolean  @default(false)
   eventsPath      String?
   description     String?
-  approved        Boolean @default(false)
+  approved        Boolean  @default(false)
 
   @@index([featured])
 }
 
-
 model Event {
-  id              String   @id @default(cuid())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  name            String
-  startDate       DateTime
-  endDate         DateTime
-  artist          Artist   @relation(fields: [artistId], references: [id])
-  featured        Boolean  @default(false)
-  instagramHandle String?
-  website         String?
-  venue           Venue    @relation(fields: [venueId], references: [id])
-  artistId        String
-  venueId         String
-  cancelled       Boolean  @default(false)
-  description     String?
-
-  approved        Boolean @default(false)
+  id                String   @id @default(cuid())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  name              String
+  startDate         DateTime
+  endDate           DateTime
+  artistId          String
+  venueId           String
+  artist            Artist   @relation(fields: [artistId], references: [id])
+  venue             Venue    @relation(fields: [venueId], references: [id])
+  featured          Boolean  @default(false)
+  instagramHandle   String?
+  website           String?
+  cancelled         Boolean  @default(false)
+  description       String?
+  conflict          Boolean  @default(false)
+  approved          Boolean  @default(false)
+  conflictEventId   String?
+  conflictEvent     Event?   @relation(name: "ConflictEvent", fields: [conflictEventId], references: [id])
+  conflictingEvents Event[]  @relation(name: "ConflictEvent")
 
   @@unique([startDate, venueId])
   @@index([featured, name])
@@ -156,4 +158,3 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
-

@@ -162,10 +162,6 @@ export default class Scraper {
    * Use the HtmlToTextTransformer or custom util to convert HTML content to plain text.
    */
   private async transformHtmlToText(docs: DocumentInterface[]) {
-    // for (let doc of docs) {
-    //   doc.pageContent = cleanHtml(doc.pageContent);
-    // }
-    // logger.debug(`Cleaned HTML: ${docs[0].pageContent}`);
     const transformer = new HtmlToTextTransformer();
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: this.chunkSize,

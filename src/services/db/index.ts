@@ -164,17 +164,27 @@ export default class Database {
   /**
    * Process scraped event data and return a partial event
    * Skip duplicates and cancel events that have been rescheduled
+   * - we want to check if we have an event at the same time
    * @param {ScrapedEvent} scrapedEvent
    * @param {string} venueId
    */
   private async checkForDuplicates(
     scrapedEvent: ScrapedEvent,
   ): Promise<ScrapedEvent | undefined> {
-    const existingEvent = await this.prisma.event.findUnique({
+    const existingEvent = await this.prisma.event.findFirst({
       where: {
-        startDate_venueId: {
-          venueId: scrapedEvent.venueId,
-          startDate: scrapedEvent.startDate,
+        startDate: {
+          lte: DateTime.fromISO(scrapedEvent.startDate)
+            .plus({ hours: 4 })
+            .toJSDate(),
+          gte: DateTime.fromISO(scrapedEvent.startDate)
+            .minus({ hours: 4 })
+            .toJSDate(),
+        },
+        venueId: scrapedEvent.venueId,
+        name: {
+          contains: scrapedEvent.eventName,
+          mode: "insensitive",
         },
       },
       include: {
@@ -184,15 +194,18 @@ export default class Database {
     });
 
     if (existingEvent) {
+      return;
       // If event is duplicate skip
-      if (
-        existingEvent.artist.name.toLowerCase() ===
-        scrapedEvent.artist.toLowerCase()
-      ) {
-        return;
-      }
-      // if event name is different, deactive previous event
-      // and create new one
+      // if (
+      //   existingEvent.artist.name.toLowerCase() ===
+      //     scrapedEvent.artist.toLowerCase() ||
+      //   existingEvent.name.toLowerCase() ===
+      //     scrapedEvent.eventName?.toLowerCase()
+      // ) {
+      //   return;
+      // }
+      // // if event name is different, deactive previous event
+      // // and create new one
       // else {
       //   await this.prisma.event.update({
       //     where: { id: existingEvent.id },
@@ -220,6 +233,7 @@ export default class Database {
       artist = await this.prisma.artist.create({
         data: {
           name: scrapedEvent.artist,
+          approved: true,
         },
       });
     }
