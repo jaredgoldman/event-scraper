@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Event Scraping Service is designed to scrape event data from various venues, process the events, and store them in a database. This service uses Node.js, Prisma ORM, Puppeteer and Langchain to extract and normalize event information. The scraper is intended to be used for (jazzintoronto)[https://jazzintoronto.com] and currently but can be used for extracting events of any kind. Contributions are welcome to extend the functionality of the scraper.
+Event Scraper is designed to scrape event data from various venues, process the events, and store them in a database. This service uses Node.js, Prisma ORM, Puppeteer and Langchain to extract and normalize event information. The scraper is intended to be used for (jazzintoronto)[https://jazzintoronto.com] and currently but can be used for extracting events of any kind. Contributions are welcome to extend the functionality of the scraper.
 
 ## Installation
 
