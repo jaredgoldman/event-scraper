@@ -86,7 +86,7 @@ switch (env.NODE_ENV) {
         scheduled: true,
       });
     } else {
-      main;
+      main()
     }
     break;
   case "test":

@@ -69,7 +69,6 @@ export default class Database {
     }
 
     for (const event of scrapedEvents) {
-      let normalized: ScrapedEvent | undefined;
       try {
         const validated = scrapedEventSchema.parse(event);
 
@@ -81,28 +80,39 @@ export default class Database {
             .toISO() as string;
         }
 
-        normalized = await this.checkForDuplicates(validated);
+        const { conflict, duplicate } =
+          await this.checkForDuplicatesAndConflicts(validated);
 
-        if (!normalized) {
+        if (duplicate) {
           logger.debug(
             `Skipping duplicate event: ${event.eventName ? event.eventName : event.artist}`,
           );
           continue;
         }
 
-        const artist = await this.maybeCreateArtist(normalized);
+        /*
+         * TODO: Implement conflicting event functionality
+         */
+        if (conflict) {
+          logger.debug(
+            `Skipping conflicting event: ${event.eventName ? event.eventName : event.artist}`,
+          );
+          continue;
+        }
+
+        const artist = await this.maybeCreateArtist(event);
 
         transactionData.push({
-          ...normalized,
+          ...event,
           artistId: artist.id,
         });
       } catch (e: unknown) {
-        if (event.eventName && !event.artist && normalized) {
+        if (event.eventName && !event.artist && event) {
           /*
            * If we have an event name but no artist, we can assume it's a
            * various event
            */
-          transactionData.push({ ...normalized, artistId: variousArtist.id });
+          transactionData.push({ ...event, artistId: variousArtist.id });
         } else {
           logger.error(`Error processing event: ${e}`, event);
         }
@@ -115,15 +125,16 @@ export default class Database {
           try {
             assert(data.artistId, "Artist ID is required");
 
-            const startDate = DateTime.fromISO(data.startDate).setZone(
-              "America/Toronto",
-            );
+            const startDate = DateTime.fromISO(data.startDate)
+              // Set the year to the current year always
+              .set({ year: DateTime.now().year })
+              .setZone("America/Toronto");
 
             const endDate = data.endDate
               ? DateTime.fromISO(data.endDate).setZone("America/Toronto")
               : startDate.plus({ hours: 2 });
 
-            if (startDate < DateTime.now()) {
+            if (startDate < DateTime.now().minus({ days: 3 })) {
               logger.debug(
                 `Skipping event in the past: ${data.eventName || data.artist}`,
               );
@@ -162,19 +173,24 @@ export default class Database {
   }
 
   /**
-   * Process scraped event data and return a partial event
-   * Skip duplicates and cancel events that have been rescheduled
-   * - we want to check if we have an event at the same time
+   * Check for duplicate events, i.e. events that are within 4 hours of each other
+   * with the same name and venue
    * @param {ScrapedEvent} scrapedEvent
    * @param {string} venueId
+   * @returns {Promise<{ event: ScrapedEvent; conflict: boolean }>}
    */
-  private async checkForDuplicates(
+  private async checkForDuplicatesAndConflicts(
     scrapedEvent: ScrapedEvent,
-  ): Promise<ScrapedEvent | undefined> {
+  ): Promise<{
+    scrapedEvent: ScrapedEvent;
+    conflict: boolean;
+    duplicate: boolean;
+  }> {
     const existingEvent = await this.prisma.event.findFirst({
       where: {
         startDate: {
           lte: DateTime.fromISO(scrapedEvent.startDate)
+            .set({ year: DateTime.now().year })
             .plus({ hours: 4 })
             .toJSDate(),
           gte: DateTime.fromISO(scrapedEvent.startDate)
@@ -182,9 +198,11 @@ export default class Database {
             .toJSDate(),
         },
         venueId: scrapedEvent.venueId,
-        name: {
-          contains: scrapedEvent.eventName,
-          mode: "insensitive",
+        artist: {
+          name: {
+            contains: scrapedEvent.artist,
+            mode: "insensitive",
+          },
         },
       },
       include: {
@@ -193,28 +211,18 @@ export default class Database {
       },
     });
 
-    if (existingEvent) {
-      return;
-      // If event is duplicate skip
-      // if (
-      //   existingEvent.artist.name.toLowerCase() ===
-      //     scrapedEvent.artist.toLowerCase() ||
-      //   existingEvent.name.toLowerCase() ===
-      //     scrapedEvent.eventName?.toLowerCase()
-      // ) {
-      //   return;
-      // }
-      // // if event name is different, deactive previous event
-      // // and create new one
-      // else {
-      //   await this.prisma.event.update({
-      //     where: { id: existingEvent.id },
-      //     data: { cancelled: true },
-      //   });
-      // }
-    }
+    // event is duplicate if it has the same start time
+    const isDuplicate = Boolean(
+      existingEvent &&
+        DateTime.fromJSDate(existingEvent?.startDate) ===
+          DateTime.fromISO(scrapedEvent.startDate),
+    );
 
-    return scrapedEvent;
+    return {
+      scrapedEvent,
+      conflict: Boolean(existingEvent),
+      duplicate: isDuplicate,
+    };
   }
 
   /**

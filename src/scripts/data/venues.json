@@ -73,7 +73,6 @@
     "name": "The Pilot",
     "address": "22 Cumberland St",
     "city": "Toronto",
-    "photoName": "photo.jpg",
     "instagramHandle": "@thepilot_to",
     "website": "thepilot.ca",
     "latitude": 43.6709,
@@ -88,7 +87,6 @@
     "name": "Hirut Cafe",
     "address": "2050 Danforth Ave",
     "city": "Toronto",
-    "photoName": "photo.jpg",
     "instagramHandle": "@hirut_cafe",
     "website": "hirutjazz.ca",
     "latitude": 43.6849,
@@ -97,6 +95,34 @@
     "eventsPath": "/copy-of-live-shows",
     "phoneNumber": "416-551-7560",
     "facebookLink": "https://www.facebook.com/Hirut-Cafe-102171111218",
+    "approved": true
+  },
+  {
+    "name": "Lula Lounge",
+    "address": "1585 Dundas St W",
+    "city": "Toronto",
+    "instagramHandle": "@lulalounge",
+    "website": "lula.ca",
+    "latitude": 43.6499,
+    "longitude": -79.4354,
+    "crawlable": true,
+    "eventsPath": "events",
+    "phoneNumber": "416-588-0307",
+    "facebookLink": "https://www.facebook.com/LulaLounge",
+    "approved": true
+  },
+  {
+    "name": "Poetry Jazz Cafe",
+    "address": "224 Augusta Ave",
+    "city": "Toronto",
+    "instagramHandle": "@poetryjazzcafe",
+    "website": "poetryjazzcafe.com",
+    "latitude": 43.6559,
+    "longitude": -79.3794,
+    "crawlable": true,
+    "eventsPath": "livemusic",
+    "phoneNumber": "416-599-5299",
+    "facebookLink": "https://www.facebook.com/PoetryJazzCafe",
     "approved": true
   }
 ]
