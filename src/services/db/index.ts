@@ -1,5 +1,6 @@
-import { PrismaClient, Venue } from "@prisma/client";
+import { Event, PrismaClient, Venue } from "@prisma/client";
 import { ScrapedEvent } from "../../utils/validation";
+import { EventWithArtistVenue } from "../../types";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -59,7 +60,7 @@ export default class Database {
    * Process array of normalized events and save to db
    */
   async processAndCreateEvents(scrapedEvents: ScrapedEvent[]) {
-    const transactionData: ScrapedEvent[] = [];
+    const transactionData: (ScrapedEvent & { conflict: boolean })[] = [];
     const variousArtist = await this.prisma.artist.findUnique({
       where: { name: "Various" },
     });
@@ -69,6 +70,7 @@ export default class Database {
     }
 
     for (const event of scrapedEvents) {
+      let isConflict = false;
       try {
         const validated = scrapedEventSchema.parse(event);
 
@@ -80,10 +82,10 @@ export default class Database {
             .toISO() as string;
         }
 
-        const { conflict, duplicate } =
+        const { conflictEvent, isDuplicate } =
           await this.checkForDuplicatesAndConflicts(validated);
 
-        if (duplicate) {
+        if (isDuplicate) {
           logger.debug(
             `Skipping duplicate event: ${event.eventName ? event.eventName : event.artist}`,
           );
@@ -93,11 +95,12 @@ export default class Database {
         /*
          * TODO: Implement conflicting event functionality
          */
-        if (conflict) {
+        if (conflictEvent) {
           logger.debug(
-            `Skipping conflicting event: ${event.eventName ? event.eventName : event.artist}`,
+            `Found conflicting event: ${conflictEvent.name ? conflictEvent.name : conflictEvent.artist.name}`,
           );
-          continue;
+          isConflict = true;
+          await this.updateConflictingEvent(conflictEvent);
         }
 
         const artist = await this.maybeCreateArtist(event);
@@ -105,6 +108,7 @@ export default class Database {
         transactionData.push({
           ...event,
           artistId: artist.id,
+          conflict: isConflict,
         });
       } catch (e: unknown) {
         if (event.eventName && !event.artist && event) {
@@ -112,7 +116,11 @@ export default class Database {
            * If we have an event name but no artist, we can assume it's a
            * various event
            */
-          transactionData.push({ ...event, artistId: variousArtist.id });
+          transactionData.push({
+            ...event,
+            conflict: isConflict,
+            artistId: variousArtist.id,
+          });
         } else {
           logger.error(`Error processing event: ${e}`, event);
         }
@@ -146,6 +154,7 @@ export default class Database {
                 name: data.eventName ?? "",
                 startDate: startDate.toJSDate(),
                 endDate: endDate.toJSDate(),
+                conflict: data.conflict,
                 artist: { connect: { id: data.artistId } },
                 venue: { connect: { id: data.venueId } },
                 approved: !Boolean(env.NODE_ENV === "development"),
@@ -176,15 +185,14 @@ export default class Database {
    * Check for duplicate events, i.e. events that are within 4 hours of each other
    * with the same name and venue
    * @param {ScrapedEvent} scrapedEvent
-   * @param {string} venueId
-   * @returns {Promise<{ event: ScrapedEvent; conflict: boolean }>}
+   * @returns {Promise<{ scrapedEvent: ScrapedEvent; conflictEvent: Event; isDuplicate: boolean }>}
    */
   private async checkForDuplicatesAndConflicts(
     scrapedEvent: ScrapedEvent,
   ): Promise<{
     scrapedEvent: ScrapedEvent;
-    conflict: boolean;
-    duplicate: boolean;
+    conflictEvent: EventWithArtistVenue | null;
+    isDuplicate: boolean;
   }> {
     const existingEvent = await this.prisma.event.findFirst({
       where: {
@@ -220,8 +228,8 @@ export default class Database {
 
     return {
       scrapedEvent,
-      conflict: Boolean(existingEvent),
-      duplicate: isDuplicate,
+      conflictEvent: existingEvent,
+      isDuplicate: isDuplicate,
     };
   }
 
@@ -247,5 +255,25 @@ export default class Database {
     }
 
     return artist;
+  }
+
+  /**
+   * Update event with conflicting event
+   * @param {Event} event
+   */
+  private async updateConflictingEvent(event: Event) {
+    // we would like to add a conflicting event to the conflicting event fields
+    await this.prisma.event.update({
+      where: {
+        id: event.id,
+      },
+      data: {
+        conflictingEvents: {
+          connect: {
+            id: event.id,
+          },
+        },
+      },
+    });
   }
 }
