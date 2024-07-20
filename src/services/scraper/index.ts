@@ -56,6 +56,7 @@ export default class Scraper {
     this.loader = new PuppeteerWebBaseLoader(eventsUrl, {
       launchOptions: {
         headless: true,
+        args: ["--no-sandbox", "--disabled-setupid-sandbox"],
       },
       gotoOptions: {
         waitUntil: "domcontentloaded",
@@ -154,7 +155,7 @@ export default class Scraper {
       } else {
         logger.error(`Error events for ${this.venue.name}: ${e}`);
       }
-      return undefined
+      return undefined;
     }
   }
 
