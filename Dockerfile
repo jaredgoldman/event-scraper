@@ -24,5 +24,5 @@ COPY . .
 RUN pnpm run build
 
 # Start the application
-CMD pnpm run start
+CMD ["/usr/local/bin/node", "./dist/index.js"]
 
