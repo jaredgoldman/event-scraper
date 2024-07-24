@@ -57,6 +57,7 @@ export default class Scraper {
       launchOptions: {
         headless: true,
         args: ["--no-sandbox", "--disabled-setupid-sandbox"],
+        executablePath: "/usr/bin/google-chrome",
       },
       gotoOptions: {
         waitUntil: "domcontentloaded",
