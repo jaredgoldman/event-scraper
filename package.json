@@ -1,11 +1,11 @@
-{
+
   "name": "eventScraper",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
     "start": "node  ./dist/index.js",
-    "build": "tsc",
+    "build": "pnpm run prisma generate && tsc",
     "dev": "nodemon --exec ts-node src/index.ts",
     "studio": "prisma studio",
     "db:generate": "dotenv -e .env -- prisma generate",
