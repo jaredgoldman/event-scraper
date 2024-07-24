@@ -29,9 +29,6 @@ ENV DATABASE_URL=${DATABASE_URL}
 # Build the TypeScript code and run Prisma migrations
 RUN pnpm run build
 
-# Expose the port that your Express.js app is running on
-EXPOSE 3000
-
 # Start the application
-CMD ["pnpm", "start"]
+CMD ["pnpm", "run", "start"]
 
