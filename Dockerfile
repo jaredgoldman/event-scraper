@@ -48,5 +48,5 @@ ENV DATABASE_URL=${DATABASE_URL}
 RUN pnpm run build
 
 # Start the application
-CMD ["pnpm", "start"]
+CMD ["npm", "start"]
 
