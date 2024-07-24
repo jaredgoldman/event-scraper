@@ -20,15 +20,9 @@ RUN npm install -g pnpm && pnpm install
 # Copy the rest of the application code
 COPY . .
 
-# Set the build-time environment variables
-ARG DATABASE_URL
-
-# Set the runtime environment variables
-ENV DATABASE_URL=${DATABASE_URL}
-
 # Build the TypeScript code and run Prisma migrations
 RUN pnpm run build
 
 # Start the application
-CMD ["pnpm", "run", "start"]
+CMD pnpm run start
 
