@@ -1,5 +1,5 @@
 # Use the latest Node.js LTS (Long Term Support) version as the base image
-FROM node:21.7.3-slim
+FROM node:18-slim
 
 RUN apt-get update && apt-get install gnupg wget -y && \
   wget --quiet --output-document=- https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor > /etc/apt/trusted.gpg.d/google-archive.gpg && \
