@@ -124,5 +124,19 @@
     "phoneNumber": "416-599-5299",
     "facebookLink": "https://www.facebook.com/PoetryJazzCafe",
     "approved": true
+  },
+  {
+    "name": "The Emmet Ray",
+    "address": "924 College St",
+    "city": "Toronto",
+    "instagramHandle": "@theemmetray",
+    "website": "theemmetray.com",
+    "latitude": 43.6559,
+    "longitude": -79.3794,
+    "crawlable": true,
+    "eventsPath": "events-2023",
+    "phoneNumber": "416-792-4497",
+    "facebookLink": "https://www.facebook.com/TheEmmetRay",
+    "approved": true
   }
 ]

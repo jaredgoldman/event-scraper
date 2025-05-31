@@ -14,7 +14,6 @@ import {
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
-import { cleanHtml } from "../../utils";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import { logger } from "../logger";
 import { z } from "zod";
@@ -33,7 +32,7 @@ export default class Scraper {
   private eventSchema = scrapedEventSchema;
   private embeddings: Embeddings;
   private ai: Ai;
-  private chunkSize = 4000;
+  private chunkSize = 2000;
   private ragChain: RunnableSequence | null = null;
 
   /**
@@ -57,16 +56,40 @@ export default class Scraper {
       launchOptions: {
         headless: true,
         args: ["--no-sandbox", "--disabled-setupid-sandbox"],
-        executablePath: "/usr/bin/google-chrome",
+        executablePath: "/usr/bin/google-chrome-stable",
+        timeout: 60000,
       },
       gotoOptions: {
-        waitUntil: "domcontentloaded",
+        waitUntil: ["networkidle0", "domcontentloaded"],
+        timeout: 60000,
       },
       async evaluate(page, browser) {
-        await wait(5000);
-        const result = await page.evaluate(() => document.body.innerHTML);
-        await browser.close();
-        return result;
+        try {
+          await page.waitForNetworkIdle({ 
+            idleTime: 1000, 
+            timeout: 30000
+          }).catch(e => {
+            logger.warn(`Network idle timeout, continuing anyway: ${e.message}`);
+          });
+          
+          await wait(5000);
+          
+          await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight);
+          }).catch(e => {
+            logger.warn(`Scroll failed, continuing anyway: ${e.message}`);
+          });
+          
+          await wait(2000);
+          
+          const result = await page.evaluate(() => document.body.innerHTML);
+          await browser.close();
+          return result;
+        } catch (error: unknown) {
+          logger.error(`Error during page evaluation: ${error instanceof Error ? error.message : String(error)}`);
+          await browser.close();
+          throw error;
+        }
       },
     });
   }
@@ -116,48 +139,109 @@ export default class Scraper {
       const prompt = ChatPromptTemplate.fromMessages([
         [
           "system",
-          `You are a large language modal skilled at parsing cleaned html data
-          with the aim of extracting structured data detailing live music events`,
+          `You are a large language model skilled at parsing cleaned html data and extracting structured data about live music events.
+          You MUST follow these rules:
+          1. Always return a valid JSON array of events
+          2. Each event MUST match the schema exactly
+          3. If you're unsure about a field, omit it rather than guessing
+          4. If no valid events are found, return an empty array []
+          5. Never include any explanatory text outside the JSON
+          6. Ensure all dates are in ISO format (YYYY-MM-DD)
+          7. Ensure all prices are numbers or null
+          8. Ensure all URLs are valid URLs or null
+          9. Each event MUST include a venueId field with the value: {venueId}`,
         ],
         [
           "user",
-          "Instructions: ${instructions} - Context: ${context} - Events already scraped: ${events}",
+          `Instructions: {instructions}
+          
+          {context}
+          
+          Events already scraped: {events}
+          
+          Remember to return ONLY a valid JSON array matching the schema.`,
         ],
       ]);
-      this.ragChain = await createStuffDocumentsChain<
-        z.infer<typeof this.eventSchema>[]
-      >({
+
+      const chain = await createStuffDocumentsChain({
         llm: this.ai,
         prompt,
         outputParser: new JsonOutputParser(),
       });
+
+      type ChainInput = {
+        instructions: string;
+        context: DocumentInterface[];
+        events: Event[];
+        venueId: string;
+      };
+
+      this.ragChain = RunnableSequence.from([
+        {
+          instructions: (input: ChainInput) => input.instructions,
+          context: (input: ChainInput) => input.context,
+          events: (input: ChainInput) => JSON.stringify(input.events),
+          venueId: (input: ChainInput) => input.venueId,
+        },
+        chain,
+      ]);
     }
 
-    try {
-      return await this.ragChain.invoke({
-        instructions: extract,
-        context,
-        events,
-      });
-    } catch (e: unknown) {
-      if (e instanceof SyntaxError) {
-        logger.error("Syntax error in JSON response, attempting to recover");
-        // Maybe we can ask the ai to continue here... but how do we connect the answers?
-        try {
-          return await this.ragChain.invoke({
-            instructions: `Your last response gave me unparsable, can you try again?`,
-            context,
-            events,
-          });
-        } catch (e: unknown) {
-          logger.error("Error recovering from JSON syntax error", e);
-          logger.debug("Context", context);
+    const maxRetries = 3;
+    let attempts = 0;
+    let lastError: unknown;
+
+    while (attempts < maxRetries) {
+      try {
+        const result = await this.ragChain.invoke({
+          instructions: extract,
+          context,
+          events,
+          venueId: this.venue.id,
+        });
+
+        // Validate the result against the schema
+        const validationResult = z.array(this.eventSchema).safeParse(result);
+        if (validationResult.success) {
+          return validationResult.data;
+        } else {
+          logger.warn(
+            `Schema validation failed on attempt ${attempts + 1}:`,
+            validationResult.error
+          );
+          throw new Error("Schema validation failed");
         }
-      } else {
-        logger.error(`Error events for ${this.venue.name}: ${e}`);
+      } catch (e: unknown) {
+        lastError = e;
+        attempts++;
+        
+        if (e instanceof SyntaxError) {
+          logger.error(
+            `JSON syntax error on attempt ${attempts}/${maxRetries}`,
+            e
+          );
+        } else {
+          logger.error(
+            `Error processing events for ${this.venue.name} on attempt ${attempts}/${maxRetries}`,
+            e
+          );
+        }
+
+        if (attempts === maxRetries) {
+          logger.error(
+            `Failed to process events for ${this.venue.name} after ${maxRetries} attempts`,
+            lastError
+          );
+          logger.debug("Context that caused the error:", context);
+          return undefined;
+        }
+
+        // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
       }
-      return undefined;
     }
+
+    return undefined;
   }
 
   /**
