@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod'
 
 export const scrapedEventSchema = z.object({
   artist: z.string().min(1),
@@ -8,6 +8,6 @@ export const scrapedEventSchema = z.object({
   venueId: z.string(),
   artistId: z.string().optional(),
   unsure: z.boolean().optional().nullable(),
-});
+})
 
-export type ScrapedEvent = z.infer<typeof scrapedEventSchema>;
+export type ScrapedEvent = z.infer<typeof scrapedEventSchema>

@@ -1,5 +1,5 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from '@prisma/client'
 
 export type EventWithArtistVenue = Prisma.EventGetPayload<{
-  include: { artist: true; venue: true };
-}>;
+  include: { artist: true; venue: true }
+}>
