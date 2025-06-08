@@ -1,4 +1,4 @@
-import env from '../config/env'
+import { env } from '../config'
 import { ChatGroq } from '@langchain/groq'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai'

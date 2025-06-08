@@ -1,5 +1,5 @@
 import pino from 'pino'
-import env from '../../config/env'
+import { env } from '../config/env'
 import { DateTime } from 'luxon'
 
 const pinoLogger = pino(
@@ -44,7 +44,7 @@ export const logger = LoggerService
 
 export const initLog = () => {
   const currentDate = DateTime.now()
-  Logger.info(`
+  LoggerService.info(`
 ====================================================
 Event Scraper now online
 ----------------------------------------------------
