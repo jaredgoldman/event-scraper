@@ -17,12 +17,23 @@ import env from "../../config/env";
  */
 export default class Database {
   private prisma: PrismaClient;
+  private readonly TIMEZONE = "America/Toronto";
 
   /**
    * @param {PrismaClient} prisma
    */
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
+  }
+
+  /**
+   * Helper method to ensure consistent timezone handling
+   * @param {string} isoDate - ISO date string
+   * @returns {DateTime} - DateTime object in Toronto timezone
+   */
+  private toTorontoTime(isoDate: string): DateTime {
+    return DateTime.fromISO(isoDate, { zone: this.TIMEZONE })
+      .setZone(this.TIMEZONE, { keepLocalTime: false });
   }
 
   /**
@@ -40,17 +51,12 @@ export default class Database {
    * Get events for the current month
    */
   async getEventsThisMonthByVenue(venue: Venue) {
+    const now = DateTime.now().setZone(this.TIMEZONE);
     return await this.prisma.event.findMany({
       where: {
         startDate: {
-          gte: DateTime.now()
-            .setZone("America/Toronto")
-            .startOf("month")
-            .toJSDate(),
-          lte: DateTime.now()
-            .setZone("America/Toronto")
-            .endOf("month")
-            .toJSDate(),
+          gte: now.startOf("month").toJSDate(),
+          lte: now.endOf("month").toJSDate(),
         },
         venueId: venue.id,
       },
@@ -64,6 +70,8 @@ export default class Database {
     const variousArtist = await this.prisma.artist.findUnique({
       where: { name: "Various" },
     });
+    const duplicateStats = new Map<string, number>();
+    const now = DateTime.now().setZone(this.TIMEZONE);
 
     if (!variousArtist) {
       throw new Error("Various artist not found");
@@ -74,20 +82,36 @@ export default class Database {
       try {
         const validated = scrapedEventSchema.parse(event);
 
-        if (!validated?.endDate) {
-          validated.endDate = DateTime.fromISO(validated.startDate)
-            .plus({
-              hours: 2,
-            })
-            .toISO() as string;
+        // Ensure dates are in Toronto timezone
+        const startDate = this.toTorontoTime(validated.startDate);
+        if (!startDate.isValid) {
+          throw new Error(`Invalid start date: ${validated.startDate}`);
         }
+
+        // If no end date, set it to 2 hours after start
+        if (!validated?.endDate) {
+          validated.endDate = startDate.plus({ hours: 2 }).toISO();
+        } else {
+          const endDate = this.toTorontoTime(validated.endDate);
+          if (!endDate.isValid) {
+            throw new Error(`Invalid end date: ${validated.endDate}`);
+          }
+          validated.endDate = endDate.toISO();
+        }
+
+        // Update the validated event with the processed dates
+        validated.startDate = startDate.toISO() as string;
 
         const { conflictEvent, isDuplicate } =
           await this.checkForDuplicatesAndConflicts(validated);
 
         if (isDuplicate) {
+          const venueName = await this.getVenueName(validated.venueId);
+          const currentCount = duplicateStats.get(venueName) || 0;
+          duplicateStats.set(venueName, currentCount + 1);
+
           logger.debug(
-            `Skipping duplicate event: ${event.eventName ? event.eventName : event.artist}`,
+            `Skipping duplicate event: ${event.eventName ? event.eventName : event.artist} at ${venueName}`,
           );
           continue;
         }
@@ -127,22 +151,28 @@ export default class Database {
       }
     }
 
+    // Log duplicate statistics
+    if (duplicateStats.size > 0) {
+      logger.info("Duplicate events summary:");
+      for (const [venue, count] of duplicateStats.entries()) {
+        logger.info(`${venue}: ${count} duplicate events`);
+      }
+    }
+
     const txnResults = await Promise.all(
       transactionData
         .map(async (data) => {
           try {
             assert(data.artistId, "Artist ID is required");
 
-            const startDate = DateTime.fromISO(data.startDate)
-              // Set the year to the current year always
-              .set({ year: DateTime.now().year })
-              .setZone("America/Toronto");
-
+            // Ensure dates are in Toronto timezone
+            const startDate = this.toTorontoTime(data.startDate);
             const endDate = data.endDate
-              ? DateTime.fromISO(data.endDate).setZone("America/Toronto")
+              ? this.toTorontoTime(data.endDate)
               : startDate.plus({ hours: 2 });
 
-            if (startDate < DateTime.now().minus({ days: 3 })) {
+            // Skip events more than 3 days in the past
+            if (startDate < now.minus({ days: 3 })) {
               logger.debug(
                 `Skipping event in the past: ${data.eventName || data.artist}`,
               );
@@ -194,24 +224,39 @@ export default class Database {
     conflictEvent: EventWithArtistVenue | null;
     isDuplicate: boolean;
   }> {
-    const existingEvent = await this.prisma.event.findFirst({
+    // Parse the start date and ensure it's in Toronto timezone
+    const eventStartDate = this.toTorontoTime(scrapedEvent.startDate);
+    if (!eventStartDate.isValid) {
+      throw new Error(`Invalid start date: ${scrapedEvent.startDate}`);
+    }
+
+    // Normalize artist name for comparison
+    const normalizedArtistName = this.normalizeArtistName(scrapedEvent.artist);
+
+    // Find potential matches within a 4-hour window
+    const potentialMatches = await this.prisma.event.findMany({
       where: {
         startDate: {
-          lte: DateTime.fromISO(scrapedEvent.startDate)
-            .set({ year: DateTime.now().year })
-            .plus({ hours: 4 })
-            .toJSDate(),
-          gte: DateTime.fromISO(scrapedEvent.startDate)
-            .minus({ hours: 4 })
-            .toJSDate(),
+          lte: eventStartDate.plus({ hours: 4 }).toJSDate(),
+          gte: eventStartDate.minus({ hours: 4 }).toJSDate(),
         },
         venueId: scrapedEvent.venueId,
-        artist: {
-          name: {
-            contains: scrapedEvent.artist,
-            mode: "insensitive",
+        OR: [
+          {
+            artist: {
+              name: {
+                contains: normalizedArtistName,
+                mode: "insensitive",
+              },
+            },
           },
-        },
+          {
+            name: {
+              contains: normalizedArtistName,
+              mode: "insensitive",
+            },
+          },
+        ],
       },
       include: {
         artist: true,
@@ -219,18 +264,124 @@ export default class Database {
       },
     });
 
-    // event is duplicate if it has the same start time
-    const isDuplicate = Boolean(
-      existingEvent &&
-        DateTime.fromJSDate(existingEvent?.startDate) ===
-          DateTime.fromISO(scrapedEvent.startDate),
+    // Calculate similarity scores for each potential match
+    const matchesWithScores = potentialMatches.map((event) => ({
+      event,
+      score: this.calculateSimilarityScore(
+        normalizedArtistName,
+        event.artist.name,
+        event.name,
+      ),
+    }));
+
+    // Sort by similarity score
+    matchesWithScores.sort((a, b) => b.score - a.score);
+
+    // Check for exact time match (duplicate)
+    const exactTimeMatch = matchesWithScores.find(
+      (match) =>
+        DateTime.fromJSDate(match.event.startDate)
+          .toUTC()
+          .equals(eventStartDate) && match.score > 0.8,
+    );
+
+    // Check for time conflict
+    const timeConflict = matchesWithScores.find(
+      (match) =>
+        !DateTime.fromJSDate(match.event.startDate)
+          .toUTC()
+          .equals(eventStartDate) && match.score > 0.8,
     );
 
     return {
       scrapedEvent,
-      conflictEvent: existingEvent,
-      isDuplicate: isDuplicate,
+      conflictEvent: timeConflict?.event ?? null,
+      isDuplicate: Boolean(exactTimeMatch),
     };
+  }
+
+  /**
+   * Normalize artist name for comparison
+   * @param {string} name - The artist name to normalize
+   * @returns {string} - The normalized name
+   */
+  private normalizeArtistName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "") // Remove special characters
+      .replace(/\s+/g, "") // Remove spaces
+      .trim();
+  }
+
+  /**
+   * Calculate similarity score between two strings
+   * @param {string} str1 - First string
+   * @param {string} str2 - Second string
+   * @returns {number} - Similarity score between 0 and 1
+   */
+  private calculateSimilarityScore(
+    normalizedName: string,
+    artistName: string,
+    eventName: string,
+  ): number {
+    const normalizedArtistName = this.normalizeArtistName(artistName);
+    const normalizedEventName = this.normalizeArtistName(eventName);
+
+    // Calculate Levenshtein distance
+    const artistDistance = this.levenshteinDistance(
+      normalizedName,
+      normalizedArtistName,
+    );
+    const eventDistance = this.levenshteinDistance(
+      normalizedName,
+      normalizedEventName,
+    );
+
+    // Calculate similarity scores
+    const artistScore =
+      1 -
+      artistDistance /
+        Math.max(normalizedName.length, normalizedArtistName.length);
+    const eventScore =
+      1 -
+      eventDistance /
+        Math.max(normalizedName.length, normalizedEventName.length);
+
+    // Return the higher score
+    return Math.max(artistScore, eventScore);
+  }
+
+  /**
+   * Calculate Levenshtein distance between two strings
+   * @param {string} str1 - First string
+   * @param {string} str2 - Second string
+   * @returns {number} - Levenshtein distance
+   */
+  private levenshteinDistance(str1: string, str2: string): number {
+    const m = str1.length;
+    const n = str2.length;
+    const dp: number[][] = Array(m + 1)
+      .fill(0)
+      .map(() => Array(n + 1).fill(0));
+
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (str1[i - 1] === str2[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1];
+        } else {
+          dp[i][j] = Math.min(
+            dp[i - 1][j - 1] + 1, // substitution
+            dp[i - 1][j] + 1, // deletion
+            dp[i][j - 1] + 1, // insertion
+          );
+        }
+      }
+    }
+
+    return dp[m][n];
   }
 
   /**
@@ -275,5 +426,18 @@ export default class Database {
         },
       },
     });
+  }
+
+  /**
+   * Get venue name by ID
+   * @param {string} venueId
+   * @returns {Promise<string>}
+   */
+  private async getVenueName(venueId: string): Promise<string> {
+    const venue = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+      select: { name: true },
+    });
+    return venue?.name || "Unknown Venue";
   }
 }

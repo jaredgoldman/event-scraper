@@ -11,6 +11,7 @@ type EnvConfig = {
   NODE_ENV: string;
   CHUNK_LIMIT: number;
   SCHEDULE_CHRON: boolean;
+  TIMEZONE: string;
 };
 
 /**
@@ -55,6 +56,10 @@ const env = envalid.cleanEnv(process.env, {
   SCHEDULE_CHRON: envalid.bool({
     desc: "Whether to schedule the chron job",
     default: false,
+  }),
+  TIMEZONE: envalid.str({
+    desc: "The timezone to use",
+    default: "America/Toronto",
   }),
 });
 
