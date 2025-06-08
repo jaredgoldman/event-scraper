@@ -11,9 +11,8 @@ import {
   Ai,
   Embeddings,
 } from "../../utils";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { HNSWLib } from "@langchain/community/vectorstores/hnswlib";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import { logger } from "../logger";
 import { z } from "zod";
@@ -22,6 +21,9 @@ import util from "util";
 import { DocumentInterface } from "@langchain/core/documents";
 import { DateTime } from "luxon";
 import env from "../../config/env";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 /**
  * A scraper that extracts structured data from a venue's events page.
@@ -37,9 +39,7 @@ export default class Scraper {
   private chunkSize = 2000;
   private ragChain: RunnableSequence | null = null;
   private originalHtml: string | null = null;
-  private readonly timezone = env.TIMEZONE
-  private readonly maxFutureDays = 90;
-  private readonly minPastDays = 7;
+  private readonly timezone = env.TIMEZONE;
   private readonly maxRetries = 3;
   private readonly retryDelay = 1000;
   private readonly circuitBreakerThreshold = 5;
@@ -105,7 +105,7 @@ export default class Scraper {
                 });
                 return true;
               },
-              { timeout: 10000 }
+              { timeout: 10000 },
             )
             .catch((e) => {
               logger.warn(
@@ -115,13 +115,18 @@ export default class Scraper {
 
           // Progressive scroll with checks for new content
           let previousHeight = 0;
-          let currentHeight = await page.evaluate(() => document.body.scrollHeight);
+          let currentHeight = await page.evaluate(
+            () => document.body.scrollHeight,
+          );
           let scrollAttempts = 0;
           const maxScrollAttempts = 5;
 
-          while (scrollAttempts < maxScrollAttempts && currentHeight > previousHeight) {
+          while (
+            scrollAttempts < maxScrollAttempts &&
+            currentHeight > previousHeight
+          ) {
             previousHeight = currentHeight;
-            
+
             await page
               .evaluate(() => {
                 window.scrollTo(0, document.body.scrollHeight);
@@ -144,7 +149,9 @@ export default class Scraper {
                 );
               });
 
-            currentHeight = await page.evaluate(() => document.body.scrollHeight);
+            currentHeight = await page.evaluate(
+              () => document.body.scrollHeight,
+            );
             scrollAttempts++;
           }
 
@@ -341,10 +348,8 @@ export default class Scraper {
    */
   public async getEvents(): Promise<ScrapedEvent[]> {
     try {
-      const initialEvents = await this.executeWithRetry(
-        () => this.parse(),
-        "parse",
-      ) ?? [];
+      const initialEvents =
+        (await this.executeWithRetry(() => this.parse(), "parse")) ?? [];
 
       if (initialEvents.length === 0) {
         return [];
@@ -370,10 +375,7 @@ export default class Scraper {
 
       return refinedEvents;
     } catch (error) {
-      logger.error(
-        `Failed to scrape events for ${this.venue.name}:`,
-        error,
-      );
+      logger.error(`Failed to scrape events for ${this.venue.name}:`, error);
       return [];
     }
   }
@@ -382,10 +384,7 @@ export default class Scraper {
    * Parse the HTML content of the venue's events page to extract structured data.
    */
   private async parse(): Promise<ScrapedEvent[]> {
-    const docs = await this.executeWithRetry(
-      () => this.loader.load(),
-      "load",
-    );
+    const docs = await this.executeWithRetry(() => this.loader.load(), "load");
 
     this.originalHtml = docs[0].pageContent;
     const newDocuments = await this.executeWithRetry(
@@ -394,7 +393,7 @@ export default class Scraper {
     );
 
     logger.debug(`Generated ${newDocuments.length} documents`);
-    const vectorStore = await MemoryVectorStore.fromDocuments(
+    const vectorStore = await HNSWLib.fromDocuments(
       newDocuments,
       this.embeddings,
     );
@@ -409,10 +408,11 @@ export default class Scraper {
       `Retrieved ${retrievedDocs.length} documents: ${util.inspect(retrievedDocs, { depth: null })}`,
     );
 
-    const response = await this.executeWithRetry(
-      () => this.callRagChain(retrievedDocs),
-      "rag",
-    ) ?? [];
+    const response =
+      (await this.executeWithRetry(
+        () => this.callRagChain(retrievedDocs as DocumentInterface<Record<string, any>>[]),
+        "rag",
+      )) ?? [];
 
     return response.map((r) => ({ ...r, venueId: this.venue.id }));
   }
@@ -430,38 +430,19 @@ export default class Scraper {
     }));
 
     if (!this.ragChain) {
-      const prompt = ChatPromptTemplate.fromMessages([
-        [
-          "system",
-          `You are a large language model skilled at parsing cleaned html data and extracting structured data about live music events.
-          You MUST follow these rules:
-          1. Always return a valid JSON array of events
-          2. Each event MUST match the schema exactly
-          3. If you're unsure about a field, omit it rather than guessing
-          4. If no valid events are found, return an empty array []
-          5. Never include any explanatory text outside the JSON
-          6. Ensure all dates are in ISO format (YYYY-MM-DD)
-          7. Ensure all prices are numbers or null
-          8. Ensure all URLs are valid URLs or null
-          9. Each event MUST include a venueId field with the value: {venueId}`,
-        ],
-        [
-          "user",
-          `Instructions: {instructions}
+      const extract = `Extract all events from the provided HTML content.
+        Each event MUST include:
+        - artist: string (required)
+        - artistId: string (optional)
+        - eventName: string (optional)
+        - startDate: string in ISO format (required)
+        - endDate: string in ISO format (optional)
+        - venueId: string (required)
+        - unsure: boolean (optional)
 
-          {context}
+        Events already scraped: {events}
 
-          Events already scraped: {events}
-
-          Remember to return ONLY a valid JSON array matching the schema.`,
-        ],
-      ]);
-
-      const chain = await createStuffDocumentsChain({
-        llm: this.ai,
-        prompt,
-        outputParser: new JsonOutputParser(),
-      });
+        Remember to return ONLY a valid JSON array matching the schema.`;
 
       type ChainInput = {
         instructions: string;
@@ -477,7 +458,15 @@ export default class Scraper {
           events: (input: ChainInput) => JSON.stringify(input.events),
           venueId: (input: ChainInput) => input.venueId,
         },
-        chain,
+        async (input) => {
+          const messages = [
+            { role: "system", content: extract },
+            { role: "user", content: input.context.map((doc: DocumentInterface) => doc.pageContent).join("\n") },
+          ];
+          const result = await this.ai.invoke(messages);
+          const content = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
+          return JSON.parse(content);
+        },
       ]);
     }
 
@@ -487,13 +476,19 @@ export default class Scraper {
 
     while (attempts < maxRetries) {
       try {
-        const result = await this.ragChain.invoke({
+        let result = await this.ragChain.invoke({
           instructions: extract,
           context,
           events,
           venueId: this.venue.id,
         });
 
+        logger.debug(`RAG Chain result: ${util.inspect(result, { depth: null })}`);
+
+        // HACK: if result is an object with an events key in it, grab contents
+        if (result && typeof result === 'object' && 'events' in result) {
+          result = result.events;
+        } 
         // Validate the result against the schema
         const validationResult = z.array(this.eventSchema).safeParse(result);
         if (validationResult.success) {
@@ -564,42 +559,29 @@ export default class Scraper {
       return events;
     }
 
-    const prompt = ChatPromptTemplate.fromMessages([
-      [
-        "system",
-        `You are an expert in verifying and refining extracted event data from HTML content.
-        Your task is to validate and refine the extracted events by comparing them with the original HTML content.
-        You MUST follow these rules:
-        1. Compare each extracted event with the original HTML content
-        2. Verify the accuracy of artist names, event names, and dates
-        3. Correct any obvious errors or inconsistencies
-        4. Add any missing events that were not extracted in the first pass
-        5. Remove any events that don't actually exist in the HTML
-        6. All times MUST be interpreted as America/Toronto timezone
-        7. Ensure all dates are in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)
-        8. Each event MUST include a venueId field with the value: {venueId}`,
-      ],
-      [
-        "user",
-        `Original HTML content: {html}
+    const systemPrompt = `You are an expert in verifying and refining extracted event data from HTML content.
+      Your task is to validate and refine the extracted events by comparing them with the original HTML content.
+      You MUST follow these rules:
+      1. Compare each extracted event with the original HTML content
+      2. Verify the accuracy of artist names, event names, and dates
+      3. Correct any obvious errors or inconsistencies
+      4. Add any missing events that were not extracted in the first pass
+      5. Remove any events that don't actually exist in the HTML
+      6. All times MUST be interpreted as America/Toronto timezone
+      7. Ensure all dates are in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)
+      8. Each event MUST include a venueId field with the value: {venueId}`;
 
-        Extracted events: {events}
+    const userPrompt = `Original HTML content: {html}
 
-        Context: {context}
+      Extracted events: {events}
 
-        Venue ID: {venueId}
+      Context: {context}
 
-        Please refine and validate these events against the original HTML content.
-        Remember that all times should be interpreted as America/Toronto timezone.
-        Return ONLY a valid JSON array matching the schema.`,
-      ],
-    ]);
+      Venue ID: {venueId}
 
-    const chain = await createStuffDocumentsChain({
-      llm: this.ai,
-      prompt,
-      outputParser: new JsonOutputParser(),
-    });
+      Please refine and validate these events against the original HTML content.
+      Remember that all times should be interpreted as America/Toronto timezone.
+      Return ONLY a valid JSON array matching the schema.`;
 
     const refinementChain = RunnableSequence.from([
       {
@@ -628,7 +610,19 @@ export default class Scraper {
           context: DocumentInterface[];
         }) => input.venueId,
       },
-      chain,
+      async (input) => {
+        const messages = [
+          { role: "system", content: systemPrompt.replace("{venueId}", input.venueId) },
+          { role: "user", content: userPrompt
+            .replace("{html}", input.html)
+            .replace("{events}", input.events)
+            .replace("{context}", input.context.map((doc: DocumentInterface) => doc.pageContent).join("\n"))
+            .replace("{venueId}", input.venueId) },
+        ];
+        const result = await this.ai.invoke(messages);
+        const content = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
+        return JSON.parse(content);
+      },
     ]);
 
     try {

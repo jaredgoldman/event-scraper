@@ -4,6 +4,8 @@ type EnvConfig = {
   DATABASE_URL: string;
   OPENAI_API_KEY: string;
   OPENAI_ORG_ID: string;
+  ANTHROPIC_API_KEY: string;
+  GOOGLE_API_KEY: string;
   ADMIN_EMAIL: string;
   AI_PROVIDER: string;
   DEBUG_LEVEL: string;
@@ -28,12 +30,18 @@ const env = envalid.cleanEnv(process.env, {
   OPENAI_ORG_ID: envalid.str({
     desc: "The open ai org id",
   }),
+  ANTHROPIC_API_KEY: envalid.str({
+    desc: "The anthropic api key",
+  }),
+  GOOGLE_API_KEY: envalid.str({
+    desc: "The google api key",
+  }),
   ADMIN_EMAIL: envalid.str({
     desc: "Email address for seed admin",
   }),
   AI_PROVIDER: envalid.str({
     desc: "The AI model to use",
-    choices: ["OPENAI", "GROQ", "COHERE"],
+    choices: ["OPENAI", "GROQ", "COHERE", "ANTHROPIC", "GOOGLE"],
   }),
   DEBUG_LEVEL: envalid.str({
     desc: "The debug level",
