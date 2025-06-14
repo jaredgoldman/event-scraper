@@ -26,10 +26,10 @@ export const htmlToTextConfig = {
     { selector: 'b', format: 'inline' },
     { selector: 'em', format: 'inline' },
     { selector: 'i', format: 'inline' },
-    { selector: 'br', format: 'lineBreak' }
+    { selector: 'br', format: 'lineBreak' },
   ],
 }
 
 export const createHtmlToTextTransformer = () => {
   return new HtmlToTextTransformer(htmlToTextConfig)
-} 
+}

@@ -19,7 +19,9 @@
   "author": "",
   "license": "ISC",
   "pnpm": {
-    "onlyBuiltDependencies": ["hnswlib-node"]
+    "onlyBuiltDependencies": [
+      "hnswlib-node"
+    ]
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",

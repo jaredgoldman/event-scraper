@@ -10,12 +10,7 @@ import { getVenueConfig } from './config/venues'
 
 const db = new DbService(prisma)
 
-const AI_PROVIDERS = [
-  'OPENAI',
-  'ANTHROPIC',
-  'GOOGLE',
-  // 'GROQ', 'COHERE',
-]
+const AI_PROVIDERS = ['OPENAI', 'ANTHROPIC', 'GOOGLE']
 
 /**
  * Extract and store events for a venue
