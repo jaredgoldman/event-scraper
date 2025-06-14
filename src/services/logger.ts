@@ -50,7 +50,7 @@ Event Scraper now online
 ----------------------------------------------------
 Boot time:                ${process.uptime()}s
 Current Time (ISO):       ${currentDate.toFormat('yyyy-MM-dd HH:mm:ss')}
-AI Provider:              ${env.AI_PROVIDER}
+AI Provider:              ${env.AI_PROVIDER || 'MULTI_PROVIDER'}
 Debug Level               ${env.DEBUG_LEVEL}
 ====================================================
 `)

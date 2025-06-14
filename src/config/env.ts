@@ -44,6 +44,7 @@ export const env = envalid.cleanEnv(process.env, {
   AI_PROVIDER: envalid.str({
     desc: 'The AI model to use',
     choices: ['OPENAI', 'GROQ', 'COHERE', 'ANTHROPIC', 'GOOGLE'],
+    default: '',
   }),
   DEBUG_LEVEL: envalid.str({
     desc: 'The debug level',

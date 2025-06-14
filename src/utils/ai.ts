@@ -18,30 +18,18 @@ export type Ai =
   | ChatAnthropic
   | ChatGoogleGenerativeAI
 
-// AI config per provider
-const aiConfigs = {
-  OPENAI: { refineEvents: false },
-  GROQ: { refineEvents: false },
-  COHERE: { refineEvents: false },
-  ANTHROPIC: { refineEvents: false },
-  GOOGLE: { refineEvents: false },
-}
-
-export type AiConfig = typeof aiConfigs["OPENAI"]
-
-export const getAiConfig = (): AiConfig => {
-  return aiConfigs[env.AI_PROVIDER as keyof typeof aiConfigs] || { refineEvents: false }
+export type AiConfig = {
+  ai: Ai
+  embeddings: Embeddings
+  refineEvents?: boolean
+  chunkSize?: number
 }
 
 /**
  * Get the AI and embeddings provider based on the AI_PROVIDER environment variable.
- * @returns {Promise<{ai: Ai, embeddings: Embeddings, chunkSize: number}>} - The AI, embeddings, and chunk size.
+ * @returns {AiConfig} - The AI, embeddings, and chunk size.
  */
-export const getAiStuff = (): {
-  ai: Ai
-  embeddings: Embeddings
-  chunkSize: number
-} => {
+export const getAiConfig = (): AiConfig => {
   switch (env.AI_PROVIDER) {
     case 'OPENAI':
       return {
@@ -52,7 +40,6 @@ export const getAiStuff = (): {
         embeddings: new OpenAIEmbeddings({
           modelName: 'text-embedding-3-small',
         }),
-        chunkSize: 12000,
       }
     case 'GROQ':
       return {
@@ -98,6 +85,14 @@ export const getAiStuff = (): {
         chunkSize: 30000,
       }
     default:
-      throw new Error('Invalid AI provider')
+      return {
+        ai: new ChatOpenAI({
+          temperature: 0.1,
+          modelName: 'gpt-4o',
+        }),
+        embeddings: new OpenAIEmbeddings({
+          modelName: 'text-embedding-3-small',
+        }),
+      }
   }
 }

@@ -1,8 +1,7 @@
-import { Ai, Embeddings } from '../utils'
+import { AiConfig, getAiConfig } from '../utils'
 import { Venue, Event } from '@prisma/client'
 import { extract } from '../prompts'
 import {
-  scrapedEventSchema,
   scrapedEventsSchema,
   ScrapedEvent,
   executeWithRetry,
@@ -10,53 +9,43 @@ import {
 } from '../utils'
 import { DocumentInterface } from '@langchain/core/documents'
 import { RunnableSequence } from '@langchain/core/runnables'
-import { z } from 'zod'
 import { logger } from './'
 import { HNSWLib } from '@langchain/community/vectorstores/hnswlib'
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters'
-import { HtmlToTextTransformer } from '@langchain/community/document_transformers/html_to_text'
 import util from 'util'
 import { VenueConfig } from '../types'
 import { createHtmlToTextTransformer } from '../config/transformers'
 import { cleanAndParseJson } from '../utils/json'
 
 export class AiService {
-  private ai: Ai
-  private embeddings: Embeddings
-  private chunkSize = 2000
   private originalHtml: string | null = null
-  private eventSchema = scrapedEventSchema
   private eventsSchema = scrapedEventsSchema
   private venue: Venue
   private venueConfig: VenueConfig | null
   private ragChain: RunnableSequence | null = null
   private eventsThisMonth: Event[]
-  private aiConfig: { refineEvents: boolean }
+  private aiConfig: AiConfig
 
   constructor(
-    ai: Ai,
-    embeddings: Embeddings,
     venue: Venue,
     eventsThisMonth: Event[],
     venueConfig?: VenueConfig,
-    aiConfig: { refineEvents: boolean } = { refineEvents: false }
+    aiConfig?: AiConfig
   ) {
-    this.ai = ai
-    this.embeddings = embeddings
     this.venue = venue
     this.eventsThisMonth = eventsThisMonth
     this.venueConfig = venueConfig || null
-    this.aiConfig = aiConfig
+    this.aiConfig = aiConfig || getAiConfig()
   }
 
   private getVenueConfigContext(): string {
-    if (!this.venueConfig) return '';
-    
+    if (!this.venueConfig) return ''
+
     const showTimes = this.venueConfig.typicalShowTimes
-      .map(time => `${time.startTime} - ${time.endTime}`)
-      .join(', ');
-    
-    return `\nVenue typically has shows at these times: ${showTimes}`;
+      .map((time) => `${time.startTime} - ${time.endTime}`)
+      .join(', ')
+
+    return `\nVenue typically has shows at these times: ${showTimes}`
   }
 
   /**
@@ -125,14 +114,16 @@ export class AiService {
                 .join('\n'),
             },
           ]
-          const response = await this.ai.invoke(messages)
-          
+          const response = await this.aiConfig.ai.invoke(messages)
+
           // Get the content using the proper AIMessage methods
           const content = response.text
-          
+
           try {
             // Parse the cleaned content
-            const parsed = cleanAndParseJson<ScrapedEvent[] | { events: ScrapedEvent[] }>(content)
+            const parsed = cleanAndParseJson<
+              ScrapedEvent[] | { events: ScrapedEvent[] }
+            >(content)
             // Handle both array and object with events property
             return Array.isArray(parsed) ? parsed : parsed.events || []
           } catch (e) {
@@ -245,7 +236,7 @@ export class AiService {
 
     for (let i = 0; i < events.length; i += batchSize) {
       const batch = events.slice(i, i + batchSize)
-      
+
       const userPrompt = `HTML content: {context}
 
         Event to refine: {events}
@@ -291,15 +282,17 @@ export class AiService {
                 .replace('{venueId}', input.venueId),
             },
           ]
-          const result = await this.ai.invoke(messages)
+          const result = await this.aiConfig.ai.invoke(messages)
           const content =
             typeof result.content === 'string'
               ? result.content
               : JSON.stringify(result.content)
-          
+
           try {
             // Parse the cleaned content
-            const parsed = cleanAndParseJson<ScrapedEvent[] | { events: ScrapedEvent[] }>(content)
+            const parsed = cleanAndParseJson<
+              ScrapedEvent[] | { events: ScrapedEvent[] }
+            >(content)
             // Handle both array and object with events property
             const events = Array.isArray(parsed) ? parsed : parsed.events || []
             // Ensure venueId is preserved
@@ -348,7 +341,7 @@ export class AiService {
   /**
    * Convert HTML content to plain text while preserving essential structure.
    */
-  private async transformHtmlToText(docs: DocumentInterface[]) {
+  public async transformHtmlToText(docs: DocumentInterface[]) {
     const transformer = createHtmlToTextTransformer()
 
     const splitter = new RecursiveCharacterTextSplitter({
@@ -360,13 +353,13 @@ export class AiService {
     const newDocuments = await sequence.invoke(docs)
 
     // Only remove empty lines and trim whitespace
-    return newDocuments.map(doc => ({
+    return newDocuments.map((doc) => ({
       ...doc,
       pageContent: doc.pageContent
         .split('\n')
-        .filter(line => line.trim().length > 0)
+        .filter((line) => line.trim().length > 0)
         .join('\n')
-        .trim()
+        .trim(),
     }))
   }
 
@@ -411,7 +404,7 @@ export class AiService {
     logger.debug(`Generated ${newDocuments.length} documents`)
     const vectorStore = await HNSWLib.fromDocuments(
       newDocuments,
-      this.embeddings
+      this.aiConfig.embeddings
     )
 
     // Use min(150, documentCount) to avoid requesting more documents than available
