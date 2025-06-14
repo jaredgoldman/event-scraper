@@ -7,10 +7,9 @@ import { Venue } from '@prisma/client'
 import util from 'util'
 import { env } from './config'
 import { getVenueConfig } from './config/venues'
+import { AI_PROVIDER_NAMES } from './const'
 
 const db = new DbService(prisma)
-
-const AI_PROVIDERS = ['OPENAI', 'ANTHROPIC', 'GOOGLE']
 
 /**
  * Extract and store events for a venue
@@ -123,7 +122,7 @@ const scrapeAndProcessAllProviders = async () => {
       },
     ])
 
-    for (const provider of AI_PROVIDERS) {
+    for (const provider of AI_PROVIDER_NAMES) {
       logger.info(`Running multi-provider scraper with AI_PROVIDER=${provider}`)
       process.env.AI_PROVIDER = provider
       // Use the same docs, but new AI/embeddings/config for each provider
