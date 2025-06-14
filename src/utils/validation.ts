@@ -21,7 +21,7 @@ const deduplicateEvents = (events: z.infer<typeof scrapedEventSchema>[]): z.infe
 
 export const scrapedEventSchema = z.object({
   artist: z.string().min(1),
-  eventName: z.string().optional(),
+  eventName: z.string().optional().nullable(),
   startDate: z.string().refine((val) => {
     try {
       const date = new Date(val)

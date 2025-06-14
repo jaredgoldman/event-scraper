@@ -73,14 +73,25 @@ export class AiService {
 
     if (!this.ragChain) {
       const extract = `Extract all events from the provided HTML content.
+        Events may be described in paragraphs, not just tables or lists. If you see a date, artist, and time in the same chunk, extract it as an event. If an event spans multiple lines, combine the information.
+
         Each event MUST include:
-        - artist: string (required)
+        - artist: string (required, the main performer or group)
+        - eventName: string (optional, the title of the event or show; do NOT repeat the artist name here)
         - artistId: string (optional)
-        - eventName: string (optional)
         - startDate: string in ISO format (required)
         - endDate: string in ISO format (optional)
         - venueId: string (required)
         - unsure: boolean (optional)
+
+        IMPORTANT:
+        - If both an artist and a show/event title are present, set artist to the performer and eventName to the show title.
+        - If only an artist is present, set eventName to null or omit it.
+        - Do NOT conflate artist and eventName. For example:
+          Example 1: <div>Artist: John Doe Quartet<br>Event: Jazz Night</div>
+            → { "artist": "John Doe Quartet", "eventName": "Jazz Night", ... }
+          Example 2: <div>Artist: Jane Smith</div>
+            → { "artist": "Jane Smith", ... }
 
         Events already scraped: {events}
         {venueConfig}
@@ -341,8 +352,8 @@ export class AiService {
     const transformer = createHtmlToTextTransformer()
 
     const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: this.chunkSize,
-      chunkOverlap: 100,
+      chunkSize: 1500,
+      chunkOverlap: 400,
     })
 
     const sequence = transformer.pipe(splitter)
@@ -414,6 +425,11 @@ export class AiService {
     logger.debug(
       `Retrieved ${retrievedDocs.length} documents: ${util.inspect(retrievedDocs, { depth: null })}`
     )
+
+    // Log each chunk's pageContent for debugging
+    retrievedDocs.forEach((doc, idx) => {
+      logger.debug(`Chunk ${idx + 1}:\n${doc.pageContent}`)
+    })
 
     const response =
       (await executeWithRetry(
