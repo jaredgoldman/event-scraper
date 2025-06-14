@@ -15,6 +15,7 @@ type EnvConfig = {
   SCHEDULE_CHRON: boolean
   TIMEZONE: string
   VENUE_TIMEOUT: number
+  MULTI_PROVIDER: boolean
 }
 
 /**
@@ -73,5 +74,9 @@ export const env = envalid.cleanEnv(process.env, {
   VENUE_TIMEOUT: envalid.num({
     desc: 'The timeout for a venue to scrape',
     default: 5000,
+  }),
+  MULTI_PROVIDER: envalid.bool({
+    desc: 'Run the scraper for all AI providers',
+    default: false,
   }),
 }) as EnvConfig

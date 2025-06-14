@@ -10,6 +10,8 @@ import { getVenueConfig } from './config/venues'
 
 const db = new DbService(prisma)
 
+const AI_PROVIDERS = ['OPENAI', 'GROQ', 'COHERE', 'ANTHROPIC', 'GOOGLE']
+
 /**
  * Extract and store events for a venue
  * @param {Venue} venue
@@ -86,23 +88,33 @@ const scrapeAndProcess = async () => {
   process.exit(-1)
 }
 
+const scrapeAndProcessAllProviders = async () => {
+  for (const provider of AI_PROVIDERS) {
+    logger.info(`\n============================\nRunning with AI_PROVIDER=${provider}\n============================`)
+    process.env.AI_PROVIDER = provider
+    await scrapeAndProcess()
+  }
+}
+
 /*
  * Main entrypoint
  */
 initLog()
 
-switch (env.NODE_ENV) {
-  case 'production':
-    if (env.SCHEDULE_CHRON) {
-      cron.schedule(env.CRON_SCHEDULE, async () => await scrapeAndProcess(), {
-        scheduled: true,
-      })
-    } else {
-      scrapeAndProcess()
-    }
-    break
-  case 'test':
-  case 'development':
-    scrapeAndProcess()
-    break
+const main = env.MULTI_PROVIDER ? scrapeAndProcessAllProviders : scrapeAndProcess
+
+  switch (env.NODE_ENV) {
+    case 'production':
+      if (env.SCHEDULE_CHRON) {
+        cron.schedule(env.CRON_SCHEDULE, async () => await main(), {
+          scheduled: true,
+        })
+      } else {
+        main()
+      }
+      break
+    case 'test':
+    case 'development':
+      main()
+      break
 }
