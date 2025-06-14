@@ -14,6 +14,7 @@ type EnvConfig = {
   CHUNK_LIMIT: number
   SCHEDULE_CHRON: boolean
   TIMEZONE: string
+  VENUE_TIMEOUT: number
 }
 
 /**
@@ -68,5 +69,9 @@ export const env = envalid.cleanEnv(process.env, {
   TIMEZONE: envalid.str({
     desc: 'The timezone to use',
     default: 'America/Toronto',
+  }),
+  VENUE_TIMEOUT: envalid.num({
+    desc: 'The timeout for a venue to scrape',
+    default: 5000,
   }),
 }) as EnvConfig

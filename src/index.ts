@@ -1,11 +1,12 @@
 import cron from 'node-cron'
 import { prisma } from './config/db'
-import { getAiStuff, wait } from './utils'
+import { getAiStuff, getAiConfig, wait } from './utils'
 import { AiService, DbService, ScraperService } from './services'
 import { logger, initLog } from './services/logger'
 import { Venue } from '@prisma/client'
 import util from 'util'
 import { env } from './config'
+import { getVenueConfig } from './config/venues'
 
 const db = new DbService(prisma)
 
@@ -15,13 +16,21 @@ const db = new DbService(prisma)
  */
 const extractAndStoreEvents = async (venue: Venue) => {
   const { ai, embeddings } = getAiStuff()
+  const aiConfig = getAiConfig()
   // Get events for the current month
   const eventsThisMonth = await db.getEventsThisMonthByVenue(venue)
   // Scrape the venue's events page
   const scraperService = new ScraperService(venue)
   const pageContent = await scraperService.scrapePage()
   // structured data from the scraped page
-  const aiService = new AiService(ai, embeddings, venue, eventsThisMonth)
+  const aiService = new AiService(
+    ai,
+    embeddings,
+    venue,
+    eventsThisMonth,
+    getVenueConfig(venue.name),
+    aiConfig
+  )
   const events = await aiService.parseScrapedHTML(pageContent)
 
   if (!Array.isArray(events)) {
@@ -52,7 +61,7 @@ const scrapeAndProcess = async () => {
 
       processedEventCount += processedEvents.length
 
-      await wait(5000)
+      await wait(env.VENUE_TIMEOUT)
       if (processedEvents.length === 0) {
         logger.warn(`No events found for ${venue.name}`)
 
