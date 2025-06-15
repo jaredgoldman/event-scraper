@@ -14,6 +14,8 @@ type EnvConfig = {
   CHUNK_LIMIT: number
   SCHEDULE_CHRON: boolean
   TIMEZONE: string
+  VENUE_TIMEOUT: number
+  MULTI_PROVIDER: boolean
 }
 
 /**
@@ -42,6 +44,7 @@ export const env = envalid.cleanEnv(process.env, {
   AI_PROVIDER: envalid.str({
     desc: 'The AI model to use',
     choices: ['OPENAI', 'GROQ', 'COHERE', 'ANTHROPIC', 'GOOGLE'],
+    default: '',
   }),
   DEBUG_LEVEL: envalid.str({
     desc: 'The debug level',
@@ -68,5 +71,13 @@ export const env = envalid.cleanEnv(process.env, {
   TIMEZONE: envalid.str({
     desc: 'The timezone to use',
     default: 'America/Toronto',
+  }),
+  VENUE_TIMEOUT: envalid.num({
+    desc: 'The timeout for a venue to scrape',
+    default: 5000,
+  }),
+  MULTI_PROVIDER: envalid.bool({
+    desc: 'Run the scraper for all AI providers',
+    default: false,
   }),
 }) as EnvConfig

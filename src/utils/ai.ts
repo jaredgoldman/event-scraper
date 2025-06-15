@@ -10,6 +10,7 @@ export type Embeddings =
   | OpenAIEmbeddings
   | CohereEmbeddings
   | MistralAIEmbeddings
+
 export type Ai =
   | ChatGroq
   | ChatOpenAI
@@ -17,11 +18,18 @@ export type Ai =
   | ChatAnthropic
   | ChatGoogleGenerativeAI
 
-export const getAiStuff = (): {
+export type AiConfig = {
   ai: Ai
   embeddings: Embeddings
-  chunkSize: number
-} => {
+  refineEvents?: boolean
+  chunkSize?: number
+}
+
+/**
+ * Get the AI and embeddings provider based on the AI_PROVIDER environment variable.
+ * @returns {AiConfig} - The AI, embeddings, and chunk size.
+ */
+export const getAiConfig = (): AiConfig => {
   switch (env.AI_PROVIDER) {
     case 'OPENAI':
       return {
@@ -29,8 +37,9 @@ export const getAiStuff = (): {
           temperature: 0.1,
           modelName: 'gpt-4o',
         }),
-        embeddings: new OpenAIEmbeddings(),
-        chunkSize: 12500,
+        embeddings: new OpenAIEmbeddings({
+          modelName: 'text-embedding-3-small',
+        }),
       }
     case 'GROQ':
       return {
@@ -38,37 +47,52 @@ export const getAiStuff = (): {
           temperature: 0.1,
           modelName: 'mixtral-8x7b-32768',
         }),
-        embeddings: new MistralAIEmbeddings(),
-        chunkSize: 2000,
+        embeddings: new MistralAIEmbeddings({
+          modelName: 'mistral-embed',
+        }),
+        chunkSize: 32000,
       }
     case 'COHERE':
       return {
         ai: new ChatCohere({
-          temperature: 0.5,
+          temperature: 0.1,
+          model: 'command-r-plus',
         }),
         embeddings: new CohereEmbeddings(),
-        chunkSize: 500,
+        chunkSize: 4000,
       }
     case 'ANTHROPIC':
       return {
         ai: new ChatAnthropic({
-          temperature: 0.5,
-          model: 'claude-sonnet-4-20250514',
+          temperature: 0.1,
+          model: 'claude-3-sonnet-20240229',
         }),
-        embeddings: new OpenAIEmbeddings(),
-        chunkSize: 12500,
+        embeddings: new OpenAIEmbeddings({
+          modelName: 'text-embedding-3-small',
+        }),
+        chunkSize: 200000,
       }
     case 'GOOGLE':
       return {
         ai: new ChatGoogleGenerativeAI({
           model: 'gemini-1.5-pro',
-          json: true,
           temperature: 0.1,
+          json: true,
         }),
-        embeddings: new OpenAIEmbeddings(),
-        chunkSize: 15000,
+        embeddings: new OpenAIEmbeddings({
+          modelName: 'text-embedding-3-small',
+        }),
+        chunkSize: 30000,
       }
     default:
-      throw new Error('Invalid AI provider')
+      return {
+        ai: new ChatOpenAI({
+          temperature: 0.1,
+          modelName: 'gpt-4o',
+        }),
+        embeddings: new OpenAIEmbeddings({
+          modelName: 'text-embedding-3-small',
+        }),
+      }
   }
 }
