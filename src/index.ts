@@ -102,8 +102,12 @@ const scrapeAndProcess = async () => {
 }
 
 const scrapeAndProcessAllProviders = async () => {
+  const stats: Record<string, Record<string, number>> = {}
+  
   for (const venue of await db.getVenues()) {
     logger.info(`scraping events for ${venue.name}`)
+    stats[venue.name] = {}
+    
     // Scrape and chunk ONCE per venue
     const eventsThisMonth = await db.getEventsThisMonthByVenue(venue)
     const scraperService = new ScraperService(venue)
@@ -135,15 +139,33 @@ const scrapeAndProcessAllProviders = async () => {
       const events = await aiService.parseScrapedHTML(docs)
       if (!Array.isArray(events)) {
         logger.error('Invalid data, expected array', events)
+        stats[venue.name][provider] = 0
         continue
       }
       logger.debug(
         `Scraped ${events.length} events for ${venue.name} with provider ${provider}: ${util.inspect(events, false, null, true)}`
       )
       await db.processAndCreateEvents(events)
+      stats[venue.name][provider] = events.length
       await wait(env.VENUE_TIMEOUT)
     }
   }
+
+  // Log detailed statistics
+  logger.info('=== Scraping Statistics ===')
+  for (const [venue, providerStats] of Object.entries(stats)) {
+    logger.info(`\nVenue: ${venue}`)
+    for (const [provider, count] of Object.entries(providerStats)) {
+      logger.info(`  ${provider}: ${count} events`)
+    }
+  }
+  
+  // Calculate totals
+  const totalEvents = Object.values(stats).reduce((total, providerStats) => {
+    return total + Object.values(providerStats).reduce((sum, count) => sum + count, 0)
+  }, 0)
+  
+  logger.info(`\nTotal events scraped across all venues and providers: ${totalEvents}`)
   logger.info(`All venues scraped for all providers, going back to sleep..💤`)
   process.exit(-1)
 }
